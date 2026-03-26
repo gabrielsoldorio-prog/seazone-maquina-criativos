@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:novocampechespotiilancamento.lovable.app)",
+      "Bash(curl -s https://novocampechespotiilancamento.lovable.app/)",
+      "Bash(curl -s https://novocampechespotiilancamento.lovable.app/assets/index-DS7kRHbN.js)",
+      "Bash(grep -oiP '\\(seazone|campeche|florianópolis|rentabilidade|ROI|empreendimento|hóspede|investidor|airbnb|temporada|fachada|rooftop|locução|lettering\\)[^\"\"\"\"]{0,200}')",
+      "Bash(taskkill //F //IM git.exe)",
+      "Bash(rm -f \"/c/Users/compu/Downloads/PROJETO MAQUINA DE CRIATIVOS/seazone-pipeline/.git/index.lock\")",
+      "Bash(du:*)"
+    ]
+  }
+}
