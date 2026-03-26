@@ -1,2 +1,12 @@
 # Arquivos de referência (vídeos, imagens, logos) - muito pesados para Git
 referencias/
+
+# Next.js
+.next/
+out/
+node_modules/
+*.log
+
+# Variáveis de ambiente
+.env.local
+.env*.local
