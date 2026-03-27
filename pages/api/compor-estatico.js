@@ -2,47 +2,45 @@ import { chamarGPT5Imagem } from '../../lib/gpt5-image'
 
 export const config = { api: { responseLimit: '12mb' }, maxDuration: 60 }
 
-// ─── Drive helpers ────────────────────────────────────────────────────────
+// ─── Configuração da pasta de fotos ──────────────────────────────────────
+// Pasta pública: https://drive.google.com/drive/folders/1x5uvswRo5HmoO_suwrrq9zH_5Z35t-_c
+const DRIVE_FOLDER_ID = '1x5uvswRo5HmoO_suwrrq9zH_5Z35t-_c'
+const DRIVE_API_KEY   = 'AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY'
 
-function parseFolderId(url) {
-  const match = url?.match(/\/folders\/([a-zA-Z0-9_-]+)/)
-  return match?.[1] || null
-}
+// ─── Listagem do Drive ────────────────────────────────────────────────────
 
-/** Lista imagens de uma pasta pública do Drive via API v3 + API key */
-async function listarImagensDrive(folderId, googleKey) {
-  const q       = encodeURIComponent(`'${folderId}' in parents and mimeType contains 'image/' and trashed = false`)
-  const fields  = encodeURIComponent('files(id,name)')
-  const apiUrl  = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${googleKey}&fields=${fields}&pageSize=20&orderBy=name`
+async function listarImagensDrive() {
+  const q      = encodeURIComponent(`'${DRIVE_FOLDER_ID}' in parents and mimeType contains 'image/' and trashed = false`)
+  const fields = encodeURIComponent('files(id,name,mimeType)')
+  const url    = `https://www.googleapis.com/drive/v3/files?q=${q}&key=${DRIVE_API_KEY}&fields=${fields}&pageSize=30&orderBy=name`
 
-  const res     = await fetch(apiUrl)
-  const raw     = await res.text()
-  if (!res.ok)  throw new Error(`Drive API ${res.status}: ${raw.slice(0, 200)}`)
+  const res = await fetch(url)
+  const raw = await res.text()
+  if (!res.ok) throw new Error(`Drive API ${res.status}: ${raw.slice(0, 300)}`)
 
   const json = JSON.parse(raw)
-  return (json.files || []).map(f => ({
+  if (!json.files?.length) throw new Error('Nenhuma imagem encontrada na pasta do Drive')
+
+  return json.files.map(f => ({
     id:   f.id,
     nome: f.name,
-    // URL pública via CDN do Google (funciona para arquivos compartilhados publicamente)
-    url:  `https://lh3.googleusercontent.com/d/${f.id}=w1280`
+    // thumbnail pública — funciona para qualquer arquivo com "Qualquer pessoa com o link"
+    url:  `https://drive.google.com/thumbnail?id=${f.id}&sz=w1600`
   }))
 }
 
-// ─── Seleção por visão ────────────────────────────────────────────────────
+// ─── Seleção por visão (GPT-5) ────────────────────────────────────────────
 
-/**
- * Usa GPT-5 vision para escolher a imagem mais adequada dado a
- * sequência visual desejada. Retorna o objeto imagem selecionado.
- */
 async function selecionarImagem(imagens, sequenciaVisual, openrouterKey) {
   if (imagens.length === 1) return imagens[0]
 
+  // Envia até 8 miniaturas para o GPT-5 escolher a mais adequada
   const content = [
     {
       type: 'text',
-      text: `Você é um diretor de arte selecionando a melhor foto para um criativo imobiliário.
-Sequência visual desejada: "${sequenciaVisual}".
-Analise as imagens numeradas abaixo e responda APENAS com o número do índice (0, 1, 2...) da mais adequada. Nada mais.`
+      text: `Você é um diretor de arte escolhendo a melhor foto de fundo para um criativo imobiliário.
+Sequência visual desejada: "${sequenciaVisual || 'imagem aérea de empreendimento imobiliário no Brasil'}".
+Analise as imagens abaixo e responda APENAS com o número do índice (0, 1, 2...) da mais adequada. Nada mais além do número.`
     },
     ...imagens.slice(0, 8).map(img => ({
       type:      'image_url',
@@ -60,25 +58,22 @@ Analise as imagens numeradas abaixo e responda APENAS com o número do índice (
     })
   })
 
-  const raw  = await res.text()
+  const raw = await res.text()
   if (!res.ok) {
-    console.warn('Seleção de imagem falhou, usando primeira:', raw.slice(0, 100))
+    console.warn('GPT-5 seleção falhou, usando primeira imagem:', raw.slice(0, 150))
     return imagens[0]
   }
 
-  const json  = JSON.parse(raw)
+  let json
+  try { json = JSON.parse(raw) } catch { return imagens[0] }
+
   const texto = json.choices?.[0]?.message?.content || '0'
   const idx   = parseInt(texto.match(/\d+/)?.[0] || '0', 10)
   return imagens[Math.min(idx, imagens.length - 1)] || imagens[0]
 }
 
-// ─── Composição visual ────────────────────────────────────────────────────
+// ─── Composição visual (GPT-5) ────────────────────────────────────────────
 
-/**
- * Compõe o estático usando GPT-5 image generation.
- * Se imagemBase fornecida, usa como fundo (visão + geração).
- * Caso contrário, gera cena de fundo por prompt.
- */
 async function compor(imagemBase, composicao, openrouterKey) {
   const {
     pin                = '',
@@ -89,31 +84,32 @@ async function compor(imagemBase, composicao, openrouterKey) {
   } = composicao
 
   const instrucoesFundo = imagemBase
-    ? 'Use the provided photo as the background image.'
-    : `Generate background: ${sequenciaVisual || 'aerial view of modern Brazilian coastal real estate development'}.`
+    ? 'Use the provided Drive photo as the background. Keep its content visible through the overlay.'
+    : `Generate background: ${sequenciaVisual || 'aerial view of modern Brazilian coastal real estate development, golden hour'}.`
 
-  const prompt = `You are composing a luxury Brazilian real estate marketing static for social media (portrait 4:5).
+  const prompt = `You are a Brazilian real estate art director composing a marketing static ad for social media (portrait 4:5 ratio, 1080×1350px).
 
-${instrucoesFundo}
+BACKGROUND: ${instrucoesFundo}
+Apply a semi-transparent dark overlay (≈40% black) over the background so text is legible.
 
-APPLY a 40% dark overlay on the background for text readability.
+OVERLAY ELEMENTS — place exactly as described, preserve all Portuguese text verbatim:
 
-OVERLAY these elements exactly (do not invent or change the copy):
-1. TOP: small location pin icon + text "${pin}" — white, 11px, top-left
-2. BADGE: pill/tag "${badge}" — coral background (#E8533A), white text, top area
-3. MAIN COPY (center, large bold white):
+① TOP-LEFT: location pin emoji 📍 + "${pin}" — white, small (≈12px), clean sans-serif
+② BADGE: rounded pill tag "${badge}" — coral/red fill (#E8533A), white bold text, near top
+③ MAIN COPY (centered, large, bold white):
 ${textoDaArte}
-4. BOTTOM BAR: thin white horizontal line + "SEAZONE" in white (bottom-left) + small logo mark
+④ Any financial figure (ROI %, R$ values) must be rendered in coral (#E8533A) and larger than surrounding text
+⑤ BOTTOM: thin white horizontal rule → "SEAZONE" logotype in white to the left, and a small circular "S" mark to the right
 
-Typography: modern sans-serif, premium feel. Hierarchy: headline large, financial data in coral (#E8533A), subtitles in white/grey.
-Output: the final composed image only.`
+Style: luxury premium real estate, clean modern typography, dark cinematic aesthetic.
+Output the final composed image — nothing else.`
 
   const messages = imagemBase
     ? [{
         role: 'user',
         content: [
           { type: 'text',      text: prompt },
-          { type: 'image_url', image_url: { url: imagemBase.url } }
+          { type: 'image_url', image_url: { url: imagemBase.url, detail: 'high' } }
         ]
       }]
     : [{ role: 'user', content: prompt }]
@@ -126,48 +122,39 @@ Output: the final composed image only.`
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' })
 
-  const { driveUrl, composicao } = req.body
-  // driveUrl:  link público da pasta do Google Drive (opcional)
   // composicao: { pin, badge, textoDaArte, sequenciaVisual, nomeEmpreendimento }
+  const { composicao } = req.body
 
   const openrouterKey = process.env.OPENROUTER_API_KEY
-  const googleKey     = process.env.GOOGLE_API_KEY
-
   if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
 
   try {
-    let imagemBase     = null
-    let totalDrive     = 0
+    // 1. Lista imagens da pasta pública do Drive
+    let imagens     = []
+    let imagemBase  = null
 
-    // 1. Tenta listar imagens do Drive (requer GOOGLE_API_KEY + pasta pública)
-    if (driveUrl && googleKey) {
-      const folderId = parseFolderId(driveUrl)
-      if (folderId) {
-        try {
-          const imagens = await listarImagensDrive(folderId, googleKey)
-          totalDrive = imagens.length
-          if (imagens.length > 0) {
-            // 2. GPT-5 seleciona a mais adequada para a sequência visual
-            imagemBase = await selecionarImagem(
-              imagens,
-              composicao?.sequenciaVisual || '',
-              openrouterKey
-            )
-          }
-        } catch (driveErr) {
-          // Drive indisponível — continua sem foto de fundo
-          console.warn('Drive listing falhou:', driveErr.message)
-        }
-      }
+    try {
+      imagens = await listarImagensDrive()
+    } catch (driveErr) {
+      console.warn('Drive listing falhou, compondo sem foto base:', driveErr.message)
     }
 
-    // 3. Compõe o estático
+    // 2. GPT-5 seleciona a foto mais adequada à sequência visual
+    if (imagens.length > 0) {
+      imagemBase = await selecionarImagem(
+        imagens,
+        composicao?.sequenciaVisual || '',
+        openrouterKey
+      )
+    }
+
+    // 3. GPT-5 compõe o estático com a foto selecionada (ou fundo gerado)
     const imagemUrl = await compor(imagemBase, composicao || {}, openrouterKey)
 
     return res.status(200).json({
       imagemUrl,
-      imagemSelecionada: imagemBase,
-      totalImagensDrive: totalDrive
+      imagemSelecionada: imagemBase ? { id: imagemBase.id, nome: imagemBase.nome } : null,
+      totalImagensDrive: imagens.length
     })
   } catch (err) {
     console.error('compor-estatico erro:', err)
