@@ -1,4 +1,4 @@
-import { callGemini } from '../../lib/gemini'
+import { callOpenRouter } from '../../lib/openrouter'
 
 export const config = {
   api: { responseLimit: '4mb' },
@@ -11,8 +11,8 @@ export default async function handler(req, res) {
   const { linkLovable, linkDrive } = req.body
   if (!linkLovable) return res.status(400).json({ error: 'Link do Lovable é obrigatório' })
 
-  const geminiKey = process.env.GEMINI_API_KEY
-  if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' })
+  const openrouterKey = process.env.OPENROUTER_API_KEY
+  if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
 
   // Tenta buscar conteúdo da página
   let paginaConteudo = ''
@@ -90,8 +90,8 @@ ${paginaConteudo}
 Extraia todas as informações e retorne o JSON estruturado.`
 
   try {
-    const rawText = await callGemini({ systemPrompt, userPrompt, geminiKey, maxOutputTokens: 3000 })
-    console.log('analisar-briefing: Gemini respondeu', rawText.slice(0, 100))
+    const rawText = await callOpenRouter({ systemPrompt, userPrompt, openrouterKey, maxTokens: 3000 })
+    console.log('analisar-briefing: OpenRouter respondeu', rawText.slice(0, 100))
 
     const match = rawText.match(/\{[\s\S]*\}/)
     if (!match) throw new Error('JSON não encontrado na resposta')
