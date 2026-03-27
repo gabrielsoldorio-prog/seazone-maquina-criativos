@@ -16,7 +16,10 @@ async function listarImagensDrive() {
   const raw = await res.text()
   if (!res.ok) throw new Error(`Drive API ${res.status}: ${raw.slice(0, 200)}`)
 
-  const json = JSON.parse(raw)
+  let json
+  try { json = JSON.parse(raw) } catch (e) {
+    throw new Error(`Drive API retornou resposta inválida: ${raw.slice(0, 200)}`)
+  }
   if (!json.files?.length) throw new Error('Nenhuma imagem encontrada na pasta do Drive')
 
   return json.files.map(f => ({
@@ -68,7 +71,9 @@ Analise as imagens abaixo e responda APENAS com o número do índice (0, 1, 2...
       body:    JSON.stringify({ model: 'openai/gpt-5', messages: [{ role: 'user', content }], max_tokens: 5 })
     })
     if (!res.ok) return imagens[0]
-    const json = JSON.parse(await res.text())
+    const raw2 = await res.text()
+    let json
+    try { json = JSON.parse(raw2) } catch { return imagens[0] }
     const idx  = parseInt((json.choices?.[0]?.message?.content || '0').match(/\d+/)?.[0] || '0', 10)
     return imagens[Math.min(idx, imagens.length - 1)] || imagens[0]
   } catch {

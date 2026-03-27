@@ -22,7 +22,10 @@ async function listarImagensDrive() {
   const res    = await fetch(apiUrl)
   const raw    = await res.text()
   if (!res.ok) throw new Error(`Drive API ${res.status}: ${raw.slice(0, 200)}`)
-  const json   = JSON.parse(raw)
+  let json
+  try { json = JSON.parse(raw) } catch (e) {
+    throw new Error(`Drive API retornou resposta inválida: ${raw.slice(0, 200)}`)
+  }
   return (json.files || []).map(f => ({
     id: f.id, nome: f.name,
     url: `https://drive.google.com/thumbnail?id=${f.id}&sz=w1600`
@@ -41,7 +44,9 @@ async function selecionarImagem(imagens, sequenciaVisual, openrouterKey) {
     body: JSON.stringify({ model: 'openai/gpt-5', messages: [{ role: 'user', content }], max_tokens: 5 })
   })
   if (!res.ok) return imagens[0]
-  const json = JSON.parse(await res.text())
+  const raw2 = await res.text()
+  let json
+  try { json = JSON.parse(raw2) } catch { return imagens[0] }
   const idx  = parseInt((json.choices?.[0]?.message?.content || '0').match(/\d+/)?.[0] || '0', 10)
   return imagens[Math.min(idx, imagens.length - 1)] || imagens[0]
 }

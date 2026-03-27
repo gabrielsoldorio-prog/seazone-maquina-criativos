@@ -102,18 +102,25 @@ Extraia todas as informações e retorne o JSON estruturado.`
       })
     })
 
+    const bodyText = await response.text()
     if (!response.ok) {
-      throw new Error(`OpenRouter ${response.status}: ${await response.text()}`)
+      throw new Error(`OpenRouter ${response.status}: ${bodyText.slice(0, 300)}`)
     }
 
-    const json = await response.json()
+    let json
+    try { json = JSON.parse(bodyText) } catch (e) {
+      throw new Error(`Resposta inválida (não é JSON): ${bodyText.slice(0, 200)}`)
+    }
     const rawText = json.choices?.[0]?.message?.content
     if (!rawText) throw new Error('Resposta vazia')
 
     const match = rawText.match(/\{[\s\S]*\}/)
     if (!match) throw new Error('JSON não encontrado na resposta')
 
-    const data = JSON.parse(match[0])
+    let data
+    try { data = JSON.parse(match[0]) } catch (e) {
+      throw new Error(`JSON do briefing malformado: ${e.message}`)
+    }
     data.linkDrive = linkDrive || ''
     data.linkLovable = linkLovable
 

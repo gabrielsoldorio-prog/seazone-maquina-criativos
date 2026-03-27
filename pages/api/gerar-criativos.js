@@ -115,9 +115,13 @@ Responda apenas com o JSON.`
       })
     })
 
-    if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${await response.text()}`)
+    const bodyText = await response.text()
+    if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${bodyText.slice(0, 300)}`)
 
-    const json = await response.json()
+    let json
+    try { json = JSON.parse(bodyText) } catch (e) {
+      throw new Error(`Resposta inválida (não é JSON): ${bodyText.slice(0, 200)}`)
+    }
     const rawText = json.choices?.[0]?.message?.content
     if (!rawText) throw new Error('Resposta vazia do modelo')
 
