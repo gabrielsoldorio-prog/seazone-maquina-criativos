@@ -77,14 +77,19 @@ Responda APENAS com JSON válido:
   }
 }`
 
+export const config = {
+  api: { responseLimit: '4mb' },
+  maxDuration: 120,
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' })
 
   const { briefing } = req.body
   if (!briefing) return res.status(400).json({ error: 'Briefing é obrigatório' })
 
-  const openrouterKey = process.env.ANTHROPIC_API_KEY
-  if (!openrouterKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada' })
+  const openrouterKey = process.env.OPENROUTER_API_KEY
+  if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
 
   try {
     const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {

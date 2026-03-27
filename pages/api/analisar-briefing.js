@@ -1,11 +1,16 @@
+export const config = {
+  api: { responseLimit: '4mb' },
+  maxDuration: 120,
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' })
 
   const { linkLovable, linkDrive } = req.body
   if (!linkLovable) return res.status(400).json({ error: 'Link do Lovable é obrigatório' })
 
-  const openrouterKey = process.env.ANTHROPIC_API_KEY
-  if (!openrouterKey) return res.status(500).json({ error: 'ANTHROPIC_API_KEY não configurada' })
+  const openrouterKey = process.env.OPENROUTER_API_KEY
+  if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
 
   // Tenta buscar conteúdo da página
   let paginaConteudo = ''

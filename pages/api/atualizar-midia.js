@@ -184,7 +184,7 @@ async function _handler(req, res) {
   if (!feedback) return res.status(400).json({ erro: 'feedback é obrigatório' })
 
   const elevenKey     = process.env.ELEVENLABS_API_KEY
-  const openrouterKey = process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY
+  const openrouterKey = process.env.OPENROUTER_API_KEY
 
   if (!openrouterKey) return res.status(500).json({ erro: 'OPENROUTER_API_KEY não configurada' })
 
