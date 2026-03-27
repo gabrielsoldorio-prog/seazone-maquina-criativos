@@ -23,40 +23,9 @@ function Spinner() {
 
 // ─── Card de material individual ──────────────────────────────────────────
 function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
-  const [feedback, setFeedback] = useState('')
-  const [atualizando, setAtualizando] = useState(false)
-  const [erroAtualizar, setErroAtualizar] = useState(null)
-
-  async function atualizar() {
-    if (!feedback.trim()) return
-    setAtualizando(true)
-    setErroAtualizar(null)
-    try {
-      const res = await fetch('/api/atualizar-midia', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          tipo,
-          feedback,
-          estrutura,
-          promptOriginal:   midia?.promptUsado   || '',
-          locucaoOriginal:  tipo !== 'estatico'
-            ? (material?.cenas || []).map(c => c.locucao).join('\n\n')
-            : ''
-        })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      onAtualizar(data)
-      setFeedback('')
-    } catch (e) {
-      setErroAtualizar(e.message)
-    } finally {
-      setAtualizando(false)
-    }
-  }
-
-  const btnLabel = tipo === 'estatico' ? 'Atualizar Imagem' : 'Atualizar Vídeo'
+  const locucaoOriginal = tipo !== 'estatico'
+    ? (material?.cenas || []).map(c => c.locucao || '').filter(Boolean).join('\n\n')
+    : ''
 
   return (
     <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
@@ -73,12 +42,17 @@ function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
         )}
       </div>
 
-      {/* Conteúdo por tipo */}
+      {/* ESTÁTICO — pins clicáveis na imagem */}
       {tipo === 'estatico' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-          {/* Imagem GPT-5 */}
-          <ImageAnnotator src={midia?.imagemUrl} alt={`Estático estrutura ${estrutura}`} />
+          <ImageAnnotator
+            src={midia?.imagemUrl}
+            alt={`Estático estrutura ${estrutura}`}
+            tipo="estatico"
+            estrutura={estrutura}
+            promptOriginal={midia?.promptUsado || ''}
+            onNovosDados={onAtualizar}
+          />
 
           {midia?.imagemErro && (
             <p style={{ margin: 0, fontSize: '11px', color: '#f87171' }}>Erro ao gerar imagem: {midia.imagemErro}</p>
@@ -100,11 +74,16 @@ function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
         </div>
       )}
 
+      {/* VÍDEO — timeline Frame.io */}
       {(tipo === 'narrado' || tipo === 'apresentadora') && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
           <VideoPlayer
             src={tipo === 'narrado' ? midia?.narradoAudio : midia?.apresentadoraAudio}
             tipo="audio"
+            tipoMidia={tipo}
+            estrutura={estrutura}
+            locucaoOriginal={locucaoOriginal}
+            onNovosDados={onAtualizar}
             label={tipo === 'narrado'
               ? 'Narração em off — ElevenLabs'
               : 'Voz da Mônica — ElevenLabs (lip-sync via script de produção)'}
@@ -124,39 +103,6 @@ function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
           <p style={{ margin: '0 0 6px', color: C.label, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Legenda do Post</p>
           <p style={{ margin: 0, color: C.sub, fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>{material.legenda}</p>
         </div>
-      )}
-
-      {/* Feedback + botão atualizar */}
-      <div style={{ marginTop: '16px', display: 'flex', gap: '8px' }}>
-        <textarea
-          value={feedback}
-          onChange={e => setFeedback(e.target.value)}
-          placeholder={`Descreva o ajuste para ${tipo === 'estatico' ? 'a imagem' : 'o áudio'}...`}
-          rows={2}
-          style={{
-            flex: 1, background: '#0d0d14', border: `1px solid ${C.border}`,
-            borderRadius: '8px', padding: '10px 12px', color: C.text,
-            fontSize: '13px', resize: 'none', fontFamily: 'inherit', outline: 'none'
-          }}
-        />
-        <button
-          onClick={atualizar}
-          disabled={atualizando || !feedback.trim()}
-          style={{
-            background: atualizando ? '#1a1a1a' : '#1a0a08',
-            border: `1px solid ${C.coral}55`, color: C.coral,
-            padding: '0 14px', borderRadius: '8px',
-            fontSize: '12px', fontWeight: '600', cursor: atualizando ? 'not-allowed' : 'pointer',
-            whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: '6px',
-            opacity: !feedback.trim() ? 0.4 : 1
-          }}
-        >
-          {atualizando ? <><Spinner /> Atualizando...</> : btnLabel}
-        </button>
-      </div>
-
-      {erroAtualizar && (
-        <p style={{ margin: '8px 0 0', color: '#f87171', fontSize: '12px' }}>{erroAtualizar}</p>
       )}
     </div>
   )
