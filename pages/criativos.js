@@ -77,65 +77,11 @@ function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
       {tipo === 'estatico' && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-          {/* Comparação lado a lado: Fal.ai vs GPT-5 */}
-          <div style={{ display: 'grid', gridTemplateColumns: midia?.imagemGPT5 ? '1fr 1fr' : '1fr', gap: '12px' }}>
+          {/* Imagem GPT-5 */}
+          <ImageAnnotator src={midia?.imagemUrl} alt={`Estático estrutura ${estrutura}`} />
 
-            {/* Fal.ai */}
-            {midia?.imagemFal && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <p style={{ margin: 0, color: C.label, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Fal.ai — Flux Schnell</p>
-                <div style={{ position: 'relative' }}>
-                  <ImageAnnotator src={midia.imagemFal} alt="Fal.ai" />
-                </div>
-                <button
-                  onClick={() => onAtualizar({ imagemUrl: midia.imagemFal })}
-                  style={{
-                    background: midia.imagemUrl === midia.imagemFal ? '#0f2a0f' : '#0d0d14',
-                    border: `1px solid ${midia.imagemUrl === midia.imagemFal ? '#4ade80' : C.border}`,
-                    color: midia.imagemUrl === midia.imagemFal ? '#4ade80' : C.sub,
-                    padding: '7px 14px', borderRadius: '7px', fontSize: '12px',
-                    fontWeight: '600', cursor: 'pointer', width: '100%'
-                  }}
-                >
-                  {midia.imagemUrl === midia.imagemFal ? '✓ Em uso' : 'Usar esta'}
-                </button>
-              </div>
-            )}
-
-            {/* GPT-5 */}
-            {midia?.imagemGPT5 && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <p style={{ margin: 0, color: C.label, fontSize: '11px', fontWeight: '600', textTransform: 'uppercase', letterSpacing: '0.05em' }}>GPT-5 — OpenRouter</p>
-                <div style={{ position: 'relative' }}>
-                  <img src={midia.imagemGPT5} alt="GPT-5" style={{ width: '100%', borderRadius: '8px', display: 'block' }} />
-                </div>
-                <button
-                  onClick={() => onAtualizar({ imagemUrl: midia.imagemGPT5 })}
-                  style={{
-                    background: midia.imagemUrl === midia.imagemGPT5 ? '#0f2a0f' : '#0d0d14',
-                    border: `1px solid ${midia.imagemUrl === midia.imagemGPT5 ? '#4ade80' : C.border}`,
-                    color: midia.imagemUrl === midia.imagemGPT5 ? '#4ade80' : C.sub,
-                    padding: '7px 14px', borderRadius: '7px', fontSize: '12px',
-                    fontWeight: '600', cursor: 'pointer', width: '100%'
-                  }}
-                >
-                  {midia.imagemUrl === midia.imagemGPT5 ? '✓ Em uso' : 'Usar esta'}
-                </button>
-              </div>
-            )}
-
-            {/* Fallback: sem comparação, mostra imagemUrl */}
-            {!midia?.imagemFal && !midia?.imagemGPT5 && (
-              <ImageAnnotator src={midia?.imagemUrl} alt={`Estático estrutura ${estrutura}`} />
-            )}
-          </div>
-
-          {/* Erros de geração */}
-          {(midia?.imagemFalErro || midia?.imagemGPT5Erro) && (
-            <div style={{ fontSize: '11px', color: '#f87171', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-              {midia.imagemFalErro  && <span>Fal.ai: {midia.imagemFalErro}</span>}
-              {midia.imagemGPT5Erro && <span>GPT-5: {midia.imagemGPT5Erro}</span>}
-            </div>
+          {midia?.imagemErro && (
+            <p style={{ margin: 0, fontSize: '11px', color: '#f87171' }}>Erro ao gerar imagem: {midia.imagemErro}</p>
           )}
 
           {material?.textoDaArte && (
@@ -313,7 +259,7 @@ export default function Criativos() {
           {loadingMidias && (
             <div style={{ background: '#0f0f14', border: `1px solid ${C.border}`, borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Spinner />
-              <span style={{ color: C.coral, fontSize: '13px', fontWeight: '500' }}>Gerando imagens em paralelo (Fal.ai + GPT-5) e áudios via ElevenLabs...</span>
+              <span style={{ color: C.coral, fontSize: '13px', fontWeight: '500' }}>Gerando imagem via GPT-5 e áudios via ElevenLabs...</span>
             </div>
           )}
           {erroMidias && (
