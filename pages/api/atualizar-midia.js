@@ -1,116 +1,241 @@
+/**
+ * API: /api/atualizar-midia
+ * Atualiza um material (estático, narrado ou apresentadora) com base em feedback/pins.
+ *
+ * Para estáticos: interpreta os pins como instruções Sharp e recompõe a imagem.
+ * Para áudios: refina a locução e gera novo áudio via ElevenLabs.
+ */
+
+import { gerarEstaticoSharp } from '../../lib/sharp-estatico'
+
 export const config = {
-  api: { responseLimit: '10mb' },
-  maxDuration: 60
+  api: { responseLimit: '12mb' },
+  maxDuration: 120,
 }
 
 const VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
 
-async function gerarImagemFal(prompt, falKey) {
-  const sub = await fetch('https://queue.fal.run/fal-ai/flux/schnell', {
-    method: 'POST',
-    headers: { 'Authorization': `Key ${falKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ prompt, image_size: 'portrait_4_3', num_inference_steps: 4, num_images: 1, enable_safety_checker: false })
-  })
-  if (!sub.ok) throw new Error(`Fal submit ${sub.status}: ${await sub.text()}`)
-  const { request_id } = await sub.json()
-
-  for (let i = 0; i < 20; i++) {
-    await new Promise(r => setTimeout(r, 3000))
-    const poll = await fetch(`https://queue.fal.run/fal-ai/flux/schnell/requests/${request_id}`, {
-      headers: { 'Authorization': `Key ${falKey}` }
-    })
-    if (!poll.ok) continue
-    const result = await poll.json()
-    if (result.status === 'COMPLETED') return result.output?.images?.[0]?.url || null
-    if (result.status === 'FAILED') throw new Error('Fal.ai falhou')
-  }
-  throw new Error('Fal.ai timeout')
-}
+// ─── ElevenLabs TTS ───────────────────────────────────────────────────────
 
 async function gerarAudio(texto, elevenKey) {
+  console.log('[atualizar-midia] ElevenLabs TTS...')
   const res = await fetch(`https://api.elevenlabs.io/v1/text-to-speech/${VOICE_ID}`, {
-    method: 'POST',
-    headers: { 'xi-api-key': elevenKey, 'Content-Type': 'application/json', 'Accept': 'audio/mpeg' },
+    method:  'POST',
+    headers: {
+      'xi-api-key':   elevenKey,
+      'Content-Type': 'application/json',
+      'Accept':       'audio/mpeg',
+    },
     body: JSON.stringify({
       text: texto,
       model_id: 'eleven_multilingual_v2',
-      voice_settings: { stability: 0.45, similarity_boost: 0.80, style: 0.3, use_speaker_boost: true }
-    })
+      voice_settings: { stability: 0.45, similarity_boost: 0.80, style: 0.3, use_speaker_boost: true },
+    }),
   })
-  if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${await res.text()}`)
-  const buf = Buffer.from(await res.arrayBuffer())
+
+  const raw = await res.text()
+  if (!res.ok) throw new Error(`ElevenLabs ${res.status}: ${raw.slice(0, 200)}`)
+
+  const buf = Buffer.from(raw, 'binary')
   return `data:audio/mpeg;base64,${buf.toString('base64')}`
 }
 
-async function refinarPromptComFeedback(promptOriginal, feedback, locucaoOriginal, tipo, openrouterKey) {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
+// ─── Claude: interpreta pins → parâmetros Sharp ────────────────────────────
+//
+// Os "pins com comentários" chegam como texto livre (ex: "copy muito longa",
+// "trocar 16,4% por 18,2%", "pin: Campeche, Florianópolis - SC").
+// Claude interpreta e retorna os campos atualizados para gerarEstaticoSharp.
+
+async function parsearPinsParaSharp(composicaoOriginal, feedback, openrouterKey) {
+  console.log('[atualizar-midia] interpretando pins com Claude...')
+
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method:  'POST',
     headers: {
       'Authorization': `Bearer ${openrouterKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://seazone.com.br',
-      'X-Title': 'Seazone Máquina de Criativos'
+      'Content-Type':  'application/json',
     },
     body: JSON.stringify({
-      model: 'anthropic/claude-opus-4-5',
-      max_tokens: 1000,
+      model:      'anthropic/claude-opus-4-5',
+      max_tokens: 600,
       messages: [
         {
-          role: 'system',
-          content: `Você é um especialista em criativos de performance para a Seazone.
-Dado um material original e um feedback, gere uma versão melhorada.
-Para imagens: retorne um novo prompt em inglês otimizado.
-Para áudios: retorne o novo texto da locução em português, mantendo as regras Seazone (termos proibidos, sufixo "com aluguel por temporada", PIN de localização).
-Responda APENAS com o texto refinado, sem explicações.`
+          role:    'system',
+          content: `Você é um assistente que interpreta feedback e pins de revisão sobre um criativo estático Seazone.
+Dado os parâmetros originais e o feedback do usuário, retorne APENAS um JSON com os parâmetros atualizados.
+
+Campos disponíveis:
+- nomeEmpreendimento: nome do empreendimento (string)
+- pin: texto da localização na barra inferior (ex: "Novo Campeche, Florianópolis - SC")
+- badge: texto do badge (normalmente "LANÇAMENTO")
+- textoDaArte: bloco de copy completo, incluindo headline e dado financeiro (ex: "16,4%")
+
+Regras:
+- Altere APENAS os campos mencionados no feedback
+- Mantenha os demais iguais ao original
+- O dado financeiro deve estar embutido em textoDaArte (ex: "16,4% ao ano de retorno líquido com aluguel por temporada")
+- Responda SOMENTE com o JSON, sem explicações`,
         },
         {
-          role: 'user',
-          content: tipo === 'estatico'
-            ? `Prompt original da imagem:\n${promptOriginal}\n\nFeedback:\n${feedback}\n\nGere um prompt melhorado em inglês:`
-            : `Locução original:\n${locucaoOriginal}\n\nFeedback:\n${feedback}\n\nGere a locução melhorada em português:`
-        }
-      ]
-    })
+          role:    'user',
+          content: `Parâmetros originais da composição:
+${JSON.stringify(composicaoOriginal, null, 2)}
+
+Feedback / pins do usuário:
+${feedback}
+
+Retorne os parâmetros atualizados em JSON:`,
+        },
+      ],
+    }),
   })
 
-  if (!response.ok) throw new Error(`OpenRouter ${response.status}`)
-  const json = await response.json()
-  return json.choices?.[0]?.message?.content?.trim() || ''
+  const raw = await res.text()
+  console.log('[atualizar-midia] OpenRouter status:', res.status)
+
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${raw.slice(0, 200)}`)
+
+  let json
+  try { json = JSON.parse(raw) } catch {
+    throw new Error(`Resposta OpenRouter não é JSON: ${raw.slice(0, 200)}`)
+  }
+
+  const content = (json.choices?.[0]?.message?.content || '').trim()
+  console.log('[atualizar-midia] Claude retornou:', content.slice(0, 200))
+
+  // Extrai JSON do conteúdo (pode vir com markdown ```json ... ```)
+  const match = content.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error(`Claude não retornou JSON: ${content.slice(0, 200)}`)
+
+  let params
+  try { params = JSON.parse(match[0]) } catch (e) {
+    throw new Error(`JSON dos parâmetros malformado: ${e.message}`)
+  }
+
+  return params
 }
 
-export default async function handler(req, res) {
-  if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' })
+// ─── Claude: refina locução com feedback ─────────────────────────────────
 
-  const { tipo, feedback, promptOriginal, locucaoOriginal, estrutura } = req.body
+async function refinarLocucao(locucaoOriginal, feedback, openrouterKey) {
+  console.log('[atualizar-midia] refinando locução com Claude...')
 
-  if (!tipo) return res.status(400).json({ error: 'tipo é obrigatório (estatico | narrado | apresentadora)' })
-  if (!feedback) return res.status(400).json({ error: 'feedback é obrigatório' })
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method:  'POST',
+    headers: {
+      'Authorization': `Bearer ${openrouterKey}`,
+      'Content-Type':  'application/json',
+    },
+    body: JSON.stringify({
+      model:      'anthropic/claude-opus-4-5',
+      max_tokens: 600,
+      messages: [
+        {
+          role:    'system',
+          content: `Você é um especialista em criativos de performance para a Seazone.
+Dado uma locução original e um feedback, gere a locução melhorada em português.
+Regras Seazone: sem termos proibidos, sufixo "com aluguel por temporada" em dados financeiros, PIN de localização no início.
+Responda APENAS com o texto da locução melhorada, sem explicações.`,
+        },
+        {
+          role:    'user',
+          content: `Locução original:\n${locucaoOriginal}\n\nFeedback:\n${feedback}\n\nLocução melhorada:`,
+        },
+      ],
+    }),
+  })
 
-  const falKey       = process.env.FAL_API_KEY
-  const elevenKey    = process.env.ELEVENLABS_API_KEY
-  const openrouterKey = process.env.ANTHROPIC_API_KEY
+  const raw = await res.text()
+  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${raw.slice(0, 200)}`)
 
-  try {
-    // 1. Refinar prompt/locução com base no feedback
-    const refinado = await refinarPromptComFeedback(
-      promptOriginal || '', feedback, locucaoOriginal || '', tipo, openrouterKey
-    )
-
-    if (tipo === 'estatico') {
-      if (!falKey) throw new Error('FAL_API_KEY não configurada')
-      const novaImagem = await gerarImagemFal(refinado, falKey)
-      return res.status(200).json({ imagemUrl: novaImagem, promptUsado: refinado })
-    }
-
-    if (tipo === 'narrado' || tipo === 'apresentadora') {
-      if (!elevenKey) throw new Error('ELEVENLABS_API_KEY não configurada')
-      const novoAudio = await gerarAudio(refinado, elevenKey)
-      return res.status(200).json({ audio: novoAudio, locucaoUsada: refinado })
-    }
-
-    return res.status(400).json({ error: `tipo inválido: ${tipo}` })
-  } catch (err) {
-    console.error('atualizar-midia erro:', err)
-    return res.status(500).json({ error: err.message })
+  let json
+  try { json = JSON.parse(raw) } catch {
+    throw new Error(`Resposta OpenRouter não é JSON: ${raw.slice(0, 200)}`)
   }
+
+  return (json.choices?.[0]?.message?.content || '').trim()
+}
+
+// ─── Handler ──────────────────────────────────────────────────────────────
+
+export default async function handler(req, res) {
+  try {
+    return await _handler(req, res)
+  } catch (err) {
+    console.error('[atualizar-midia] ERRO NÃO CAPTURADO:', err.message)
+    return res.status(500).json({ erro: err.message, detalhe: err.stack?.split('\n')[1] || '' })
+  }
+}
+
+async function _handler(req, res) {
+  if (req.method !== 'POST') {
+    return res.status(405).json({ erro: 'Método não permitido' })
+  }
+
+  const {
+    tipo,
+    feedback,
+    composicao,        // parâmetros originais da composição Sharp (estático)
+    promptOriginal,    // fallback: textoDaArte anterior (compatibilidade)
+    locucaoOriginal,   // para tipo narrado/apresentadora
+  } = req.body
+
+  if (!tipo)     return res.status(400).json({ erro: 'tipo é obrigatório (estatico | narrado | apresentadora)' })
+  if (!feedback) return res.status(400).json({ erro: 'feedback é obrigatório' })
+
+  const elevenKey     = process.env.ELEVENLABS_API_KEY
+  const openrouterKey = process.env.OPENROUTER_API_KEY || process.env.ANTHROPIC_API_KEY
+
+  if (!openrouterKey) return res.status(500).json({ erro: 'OPENROUTER_API_KEY não configurada' })
+
+  console.log('[atualizar-midia] ▶ tipo:', tipo)
+  console.log('[atualizar-midia] feedback:', feedback.slice(0, 120))
+
+  // ── ESTÁTICO: recompõe via Sharp com pins interpretados ────────────────
+  if (tipo === 'estatico') {
+    // Composição base: usa composicao se enviada, senão monta do promptOriginal
+    const composicaoBase = composicao || {
+      nomeEmpreendimento: '',
+      pin:                '',
+      badge:              'LANÇAMENTO',
+      textoDaArte:        promptOriginal || '',
+    }
+
+    console.log('[atualizar-midia] composicaoBase:', JSON.stringify(composicaoBase).slice(0, 200))
+
+    // Interpreta os pins como instruções para atualizar os campos Sharp
+    const composicaoAtualizada = await parsearPinsParaSharp(composicaoBase, feedback, openrouterKey)
+
+    // Garante que campos obrigatórios existem (fallback para base)
+    const composicaoFinal = {
+      nomeEmpreendimento: composicaoAtualizada.nomeEmpreendimento ?? composicaoBase.nomeEmpreendimento,
+      pin:                composicaoAtualizada.pin                ?? composicaoBase.pin,
+      badge:              composicaoAtualizada.badge              ?? composicaoBase.badge,
+      textoDaArte:        composicaoAtualizada.textoDaArte        ?? composicaoBase.textoDaArte,
+    }
+
+    console.log('[atualizar-midia] composicaoFinal:', JSON.stringify(composicaoFinal).slice(0, 200))
+
+    const novaImagem = await gerarEstaticoSharp(composicaoFinal)
+
+    return res.status(200).json({
+      imagemUrl:         novaImagem,
+      composicaoUsada:   composicaoFinal,
+    })
+  }
+
+  // ── ÁUDIO (narrado / apresentadora) ───────────────────────────────────
+  if (tipo === 'narrado' || tipo === 'apresentadora') {
+    if (!elevenKey) return res.status(500).json({ erro: 'ELEVENLABS_API_KEY não configurada' })
+
+    const locucaoRefinada = await refinarLocucao(locucaoOriginal || '', feedback, openrouterKey)
+    const novoAudio       = await gerarAudio(locucaoRefinada, elevenKey)
+
+    return res.status(200).json({
+      audio:        novoAudio,
+      locucaoUsada: locucaoRefinada,
+    })
+  }
+
+  return res.status(400).json({ erro: `tipo inválido: ${tipo}` })
 }
