@@ -658,3 +658,172 @@ Antes de apresentar cada roteiro ou texto, verifique:
 
 > onde houver conflito de dados.
 
+---
+
+## ESTADO ATUAL DO DESENVOLVIMENTO (atualizado 2026-03-27)
+
+Esta seção documenta o progresso técnico do pipeline de geração de imagens estáticas.
+Leia antes de qualquer trabalho de código neste projeto.
+
+---
+
+### O QUE FOI CONSTRUÍDO
+
+#### 1. Correções de JSON parse nas APIs (CONCLUÍDO, commitado e em produção)
+Todos os arquivos de API foram corrigidos com o padrão definitivo `text() + JSON.parse()` com try/catch:
+- `pages/api/gerar-midias.js`
+- `pages/api/compor-estatico.js`
+- `pages/api/gerar-criativos.js`
+- `pages/api/analisar-briefing.js`
+
+Padrão aplicado:
+```javascript
+const raw = await res.text()
+if (!res.ok) throw new Error(`Erro ${res.status}: ${raw.slice(0,300)}`)
+let json
+try { json = JSON.parse(raw) } catch(e) {
+  throw new Error(`Resposta inválida (não é JSON): ${raw.slice(0,200)}`)
+}
+```
+
+#### 2. Pipeline de geração de estático 100% Sharp (EM DESENVOLVIMENTO)
+Abordagem atual: composição 100% programática com Sharp (sem IA para a imagem final).
+- Foto real do Drive como fundo (preservada pixel-perfect)
+- SVG overlay via Sharp para todos os elementos gráficos
+- Logo Seazone real lido do arquivo local
+
+**Arquivo principal:** `ferramentas/teste-estatico-v7.mjs`
+**Output atual:** `outputs/estatico/teste-v7.png` ← última versão aprovada
+
+---
+
+### ARQUIVOS DE REFERÊNCIA LOCAIS
+
+```
+referencias/
+  logos/
+    logo-seazone-padrao-branco.png.png          ← logo Seazone branco (890×587px)
+    V07/
+      Novo Campeche Spot II_06_Inserção_TAG.png ← FUNDO PRINCIPAL (2048×1152, já tem pin+badge)
+      Novo Campeche Spot II_06_Inserção.png
+      Novo Campeche Spot II_05_Inserção.png
+  exemplos-estaticos/
+    referencia-estatico-seazone.jpg.jpg          ← referência de layout/estilo
+  monica/
+    Fotos animadas/Fotos Projeto Arquitetônico/  ← renders do empreendimento
+```
+
+---
+
+### IDs DO GOOGLE DRIVE (pasta pública, sem API key necessária)
+
+**Pasta:** `https://drive.google.com/drive/folders/1x5uvswRo5HmoO_suwrrq9zH_5Z35t-_c`
+
+URL de thumbnail (funciona sem API key):
+`https://drive.google.com/thumbnail?id=FILE_ID&sz=w1600`
+
+| ID | Conteúdo |
+|---|---|
+| `1jRJf2mdQYfyd5Dnltvzp9ZBlTr0iZLvP` | Foto aérea Novo Campeche (sem badge) — boa como background alternativo |
+| `1WOj-qV-oWC6D078AlgHxIDEeOEbRtI-d` | Rua com acesso à praia (street view) |
+| `1wgiWhkevUfDKrOK8sWZs_2qYGWH3604b` | Foto drone com praia visível — usada no thumbnail v7 |
+| `1HOt3Dxozc6WawjCxAYgr5mM8QtX21NMI` | Foto aérea bairro sem badge |
+| `1PcU22f3-12-TlBcd1le6zoqxQl9zsMdC` | Foto aérea com badge SP·OT |
+| `1_uGdSIQ3sBuU8IPjF6GfAmIBEXvyBb5P` | Foto aérea com mar — ângulo diferente |
+| `1XJ9pCnxe3c2vTt324aw8EB5iFel4kNAR` | Render fachada (landscape) |
+| `1DaWb63fHL1q1WjVJJqiS1a_znuwmT8tS` | Render fachada (landscape) |
+| `1bdJhxeSKerkiiSsgSkecd5frfKJdLh53` | Render fachada "NOVO CAMPECHE SPOT II" |
+| `1f_vxNrAF8lnURjL0sa_gIoHDlys-zwiM` | Render fachada com vegetação |
+| `1nmTz8K4nv4uqfapheLNr-fOTkIBFdloB` | Render fachada portrait (alto) |
+| `1nlV-NINZmRP3DjPGOaRxxVe9ZgnJlYP_` | Rooftop com vista para o mar |
+| `1cK5BMgo-bOSbLU0-LyoIKzVAX1cMLJqX` | Rooftop com piscina |
+| `1-M9qmcu9JS5WJBlzGgG0RNO7PKNhwTIu` | Fachada (landscape) |
+
+---
+
+### MODELOS DE IA DISPONÍVEIS NO OPENROUTER (verificados)
+
+- `openai/gpt-5-image` — gera imagens, aceita imagens de entrada (usado em v1–v3)
+- `openai/gpt-5-image-mini` — versão mais barata
+- `google/gemini-2.5-flash-image` — retorna imagem em `message.images` (não em `message.content`)
+
+**Atenção:** `openai/gpt-image-1` e `openai/gpt-5` NÃO existem no OpenRouter.
+
+**Drive API key** (`AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY`): retorna 403 porque Drive API não está habilitada no projeto GCP. Usar thumbnail URLs diretamente (sem API key).
+
+---
+
+### LAYOUT DO ESTÁTICO v7 (canvas 1080×1350px)
+
+```
+┌─────────────────────────────────────┐  y=0
+│  [miniatura 180×140px]              │  x=50, y=50
+│  [Acesso à praia →]  pill           │  y=196
+│                                     │
+│  .... tracejado pontilhado .......→●│  badge/pin já na foto
+│                                     │
+│    NOVO CAMPECHE II  (na foto)      │
+│    ████ SPOT ████   (na foto)       │  pin ≈ x=340, y=356 após crop
+│                                     │
+├─────────────────────────────────────┤  y=837  DARK_Y
+│ ● Novo Campeche, Florianópolis - SC │  BAR_H=66, logo Seazone direita
+├─────────────────────────────────────┤  y=903
+│ [LANÇAMENTO] Tenha renda passiva... │  BADGE 155×34px, COPY x=209
+│              em um dos bairros...   │
+│                                     │
+│  16,4%   ao  | de retorno líquido   │  108px coral
+│          ano | com aluguel por temp │
+│                                     │
+│ *Este material tem caráter...       │  14px, 4 linhas, y=1147
+└─────────────────────────────────────┘  y=1350
+```
+
+**Constantes principais do v7:**
+```javascript
+const W=1080, H=1350, PHOTO_H=837, DARK_Y=837, DARK_H=513
+const CORAL='#E8533A', DARK_BG={r:17,g:17,b:24,alpha:1}
+const DPIN_X=340, DPIN_Y=356   // posição visual do pin na foto após crop
+const BEACH_X=660, BEACH_Y=85  // ponto de chegada do tracejado (praia)
+const NUM_FS=108                // font-size "16,4%"
+const AO_X=372, AO_Y=1037      // "ao"
+const ANO_X=372, ANO_Y=1069    // "ano"
+const RET_X=430                 // coluna "de retorno líquido"
+```
+
+---
+
+### HISTÓRICO DE VERSÕES (ferramentas/teste-estatico-vN.mjs)
+
+| Versão | Abordagem | Resultado |
+|---|---|---|
+| v1 | GPT-5-image, só referência | descobriu o nome correto do modelo |
+| v2 | GPT-5-image + 3 imagens | foto regenerada em vez de preservada |
+| v3 | GPT-5-image + 4 imagens + spell-check | ainda regenerava o fundo |
+| v4 | Sharp programático (primeira vez) | fundo preservado, layout básico |
+| v5 | Sharp com zonas 62/38%, miniatura, tracejado | progresso, mas posições imprecisas |
+| v6 | Sharp com posições refinadas | bom resultado, mas foto sem badge |
+| **v7** | **Sharp + TAG photo como fundo (badge incluso)** | **última versão — em ajuste** |
+
+---
+
+### PRÓXIMOS PASSOS
+
+1. **Ajustar posições do tracejado** se o pin na foto não coincidir após crop (testar e medir)
+2. **Integrar o pipeline no código de produção:**
+   - Atualizar `lib/gpt5-image.js` para usar Sharp em vez de GPT-5-image
+   - Atualizar `pages/api/compor-estatico.js` para chamar o pipeline Sharp
+   - Atualizar `pages/api/gerar-midias.js` para buscar IDs do Drive via thumbnail URL
+3. **Tornar as posições configuráveis** via parâmetros do briefing (empreendimento, dados financeiros, localização)
+4. **Variantes do estático:** testar com diferentes fotos de fundo (fachada, rooftop)
+
+---
+
+### COMO RODAR O TESTE ATUAL
+
+```bash
+node --env-file=.env.local ferramentas/teste-estatico-v7.mjs
+# Output: outputs/estatico/teste-v7.png
+```
+
+Dependências: `sharp` (já instalado). Não precisa de API key para o v7 (Drive thumbnail é público).
+
