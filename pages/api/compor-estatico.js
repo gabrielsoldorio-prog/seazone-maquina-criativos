@@ -1,47 +1,9 @@
-/**
- * Agente de Composição Visual — Canva Connect API
- *
- * Fluxo:
- *   1. Lista imagens da pasta pública do Google Drive
- *   2. GPT-5 vision seleciona a foto mais adequada à sequência visual
- *   3. Baixa a imagem selecionada
- *   4. Faz upload para o Canva como asset
- *   5. Cria um design via Autofill usando o brand template configurado
- *   6. Exporta como PNG e retorna a URL
- *
- * Variáveis de ambiente necessárias:
- *   OPENROUTER_API_KEY     — para seleção por visão via GPT-5
- *   CANVA_ACCESS_TOKEN     — Bearer token do Canva Connect API
- *   CANVA_TEMPLATE_ID      — ID do brand template Seazone no Canva
- *                            (ex: DABcXyz123 — encontrado em canva.com/brand/templates)
- *
- * Mapeamento dos campos do template (nomes devem bater com o template no Canva):
- *   background_image → asset de imagem do Drive
- *   pin_localizacao  → texto do PIN
- *   badge            → texto do badge (ex: LANÇAMENTO)
- *   copy_principal   → texto da arte completo
- *   dado_financeiro  → ROI% ou R$/mês em destaque
- */
+import { chamarGPT5Imagem } from '../../lib/gpt5-image'
 
 export const config = { api: { responseLimit: '12mb' }, maxDuration: 120 }
 
 const DRIVE_FOLDER_ID = '1x5uvswRo5HmoO_suwrrq9zH_5Z35t-_c'
 const DRIVE_API_KEY   = 'AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY'
-const CANVA_BASE      = 'https://api.canva.com/rest/v1'
-
-// ─── Helpers de espera ────────────────────────────────────────────────────
-
-function sleep(ms) { return new Promise(r => setTimeout(r, ms)) }
-
-async function pollJob(getStatus, { intervalo = 2000, tentativas = 30, label = 'job' } = {}) {
-  for (let i = 0; i < tentativas; i++) {
-    const resultado = await getStatus()
-    if (resultado.status === 'success') return resultado
-    if (resultado.status === 'failed')  throw new Error(`${label} falhou: ${JSON.stringify(resultado.error || {})}`)
-    await sleep(intervalo)
-  }
-  throw new Error(`${label} timeout após ${tentativas} tentativas`)
-}
 
 // ─── Google Drive ─────────────────────────────────────────────────────────
 
@@ -58,30 +20,30 @@ async function listarImagensDrive() {
   if (!json.files?.length) throw new Error('Nenhuma imagem encontrada na pasta do Drive')
 
   return json.files.map(f => ({
-    id:        f.id,
-    nome:      f.name,
-    mimeType:  f.mimeType,
-    thumbUrl:  `https://drive.google.com/thumbnail?id=${f.id}&sz=w1600`,
-    // URL de download direto via API (funciona com a API key para arquivos públicos)
+    id:          f.id,
+    nome:        f.name,
+    mimeType:    f.mimeType,
+    thumbUrl:    `https://drive.google.com/thumbnail?id=${f.id}&sz=w1600`,
     downloadUrl: `https://www.googleapis.com/drive/v3/files/${f.id}?alt=media&key=${DRIVE_API_KEY}`
   }))
 }
 
-async function baixarImagem(imagem) {
-  // Tenta download direto via API primeiro; fallback para thumbnail
+/** Baixa a imagem e retorna base64 data URL — para enviar ao GPT-5 como visão */
+async function baixarComoBase64(imagem) {
   for (const url of [imagem.downloadUrl, imagem.thumbUrl]) {
     try {
       const res = await fetch(url)
       if (!res.ok) continue
-      const buffer = Buffer.from(await res.arrayBuffer())
-      const mime   = res.headers.get('content-type') || imagem.mimeType || 'image/jpeg'
-      if (buffer.length > 1000) return { buffer, mime }
-    } catch { /* tenta próxima URL */ }
+      const buf  = Buffer.from(await res.arrayBuffer())
+      if (buf.length < 1000) continue
+      const mime = res.headers.get('content-type') || imagem.mimeType || 'image/jpeg'
+      return `data:${mime};base64,${buf.toString('base64')}`
+    } catch { /* tenta próxima */ }
   }
   throw new Error(`Não foi possível baixar a imagem: ${imagem.nome}`)
 }
 
-// ─── Seleção por visão (GPT-5) ────────────────────────────────────────────
+// ─── Seleção por visão ────────────────────────────────────────────────────
 
 async function selecionarImagem(imagens, sequenciaVisual, openrouterKey) {
   if (imagens.length === 1) return imagens[0]
@@ -114,176 +76,70 @@ Analise as imagens abaixo e responda APENAS com o número do índice (0, 1, 2...
   }
 }
 
-// ─── Canva Connect API ────────────────────────────────────────────────────
+// ─── Composição via GPT-5 visão ───────────────────────────────────────────
 
-function canvaHeaders(token) {
-  return { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' }
-}
+function montarPromptComposicao(composicao) {
+  const {
+    pin             = '',
+    badge           = 'LANÇAMENTO',
+    textoDaArte     = '',
+    sequenciaVisual = '',
+    nomeEmpreendimento = ''
+  } = composicao
 
-/** Upload de imagem para o Canva como asset. Retorna o asset_id. */
-async function uploadAssetCanva(buffer, nome, mimeType, token) {
-  const nomeSanitizado = nome.replace(/[^a-zA-Z0-9._-]/g, '_').slice(0, 50)
-  const metadataB64    = Buffer.from(JSON.stringify({ name_base64: Buffer.from(nomeSanitizado).toString('base64') })).toString('base64')
+  // Detecta elementos condicionais pelo conteúdo do briefing
+  const mencaonaProia = /praia|beach|mar\b|litoral|beira.mar/i.test(textoDaArte + ' ' + sequenciaVisual)
 
-  // Inicia o upload job
-  const initRes = await fetch(`${CANVA_BASE}/asset-uploads`, {
-    method:  'POST',
-    headers: {
-      'Authorization':          `Bearer ${token}`,
-      'Content-Type':           mimeType || 'image/jpeg',
-      'Asset-Upload-Metadata':  Buffer.from(nomeSanitizado).toString('base64')
-    },
-    body: buffer
-  })
-  const initRaw = await initRes.text()
-  if (!initRes.ok) throw new Error(`Canva upload init ${initRes.status}: ${initRaw.slice(0, 300)}`)
+  // Elementos condicionais
+  const elementosPraia = mencaonaProia ? `
+• DOTTED WHITE LINE: draw a curved dashed/dotted white line from the red PIN marker toward the beach/sea visible in the photo — label it "Acesso à praia" in a small white pill badge with an arrow at the end` : ''
 
-  const initJson = JSON.parse(initRaw)
-  const jobId    = initJson.job?.id
-  if (!jobId) throw new Error(`Canva upload: job ID não retornado. Resposta: ${initRaw.slice(0, 200)}`)
+  return `You are a Brazilian luxury real estate art director. Your task: use the provided aerial photo as the base and compose a complete marketing static image in the exact Seazone brand style.
 
-  // Polling até o asset ficar disponível
-  const jobDone = await pollJob(
-    async () => {
-      const res  = await fetch(`${CANVA_BASE}/asset-uploads/${jobId}`, { headers: canvaHeaders(token) })
-      const json = JSON.parse(await res.text())
-      return { status: json.job?.status, asset: json.job?.asset, error: json.job?.error }
-    },
-    { label: 'upload-asset', tentativas: 20, intervalo: 2000 }
-  )
+OUTPUT FORMAT: portrait 4:5 ratio (1080×1350px), social media ready.
 
-  const assetId = jobDone.asset?.id
-  if (!assetId) throw new Error('Canva upload: asset_id não retornado após conclusão')
-  return assetId
-}
+━━━ BASE IMAGE ━━━
+• Use the provided photo as the background. Keep its aerial perspective and content visible.
+• Apply a dark gradient overlay from bottom (60% opacity black) fading to transparent at the top — so the sky/top remains clear and the lower copy area is readable.
 
-/**
- * Cria design via Autofill com brand template.
- * Os campos (keys) em `dados` devem corresponder aos campos definidos no template Canva.
- * Retorna o design_id.
- */
-async function autofillDesign(templateId, dados, token) {
-  const res = await fetch(`${CANVA_BASE}/autofills`, {
-    method:  'POST',
-    headers: canvaHeaders(token),
-    body:    JSON.stringify({ brand_template_id: templateId, title: dados._titulo || 'Seazone Criativo', data: dados })
-  })
-  const raw = await res.text()
-  if (!res.ok) throw new Error(`Canva autofill ${res.status}: ${raw.slice(0, 300)}`)
+━━━ REQUIRED ELEMENTS (place exactly as described) ━━━
 
-  const json  = JSON.parse(raw)
-  const jobId = json.job?.id
-  if (!jobId) throw new Error(`Canva autofill: job ID não retornado. Resposta: ${raw.slice(0, 200)}`)
+① RED PIN MARKER + SPOT LOGO (top area, over the development):
+  • Place a bold red/coral (#E8533A) location pin icon directly over the visible development/buildings in the photo
+  • Next to it, add a small white rectangular tag/badge with "SPOT" in bold dark text
+  • This marks the exact location of the development${elementosPraia}
 
-  // Polling até o design estar pronto
-  const jobDone = await pollJob(
-    async () => {
-      const r = await fetch(`${CANVA_BASE}/autofills/${jobId}`, { headers: canvaHeaders(token) })
-      const j = JSON.parse(await r.text())
-      return { status: j.job?.status, design: j.job?.design, error: j.job?.error }
-    },
-    { label: 'autofill', tentativas: 30, intervalo: 3000 }
-  )
+② BOTTOM BAR (fixed dark bar at the very bottom, full width):
+  • Dark charcoal/near-black background (#111118)
+  • LEFT SIDE: 📍 pin icon + "${pin}" in white, 13px clean sans-serif
+  • RIGHT SIDE: "Seazone" logotype in white with a small circular "S" icon
+  • Thin white horizontal line separating bar from image above
 
-  const designId = jobDone.design?.id
-  if (!designId) throw new Error('Canva autofill: design_id não retornado após conclusão')
-  return designId
-}
+③ BADGE (upper area, prominent):
+  • Rounded pill/capsule shape
+  • Coral/red fill (#E8533A)
+  • Bold white text: "${badge}"
 
-/**
- * Cria design simples com imagem de fundo (sem autofill).
- * Usado como fallback quando CANVA_TEMPLATE_ID não está configurado.
- */
-async function criarDesignSimples(assetId, token) {
-  const res = await fetch(`${CANVA_BASE}/designs`, {
-    method:  'POST',
-    headers: canvaHeaders(token),
-    body:    JSON.stringify({ asset_id: assetId, width: 1080, height: 1350 })
-  })
-  const raw = await res.text()
-  if (!res.ok) throw new Error(`Canva criar design ${res.status}: ${raw.slice(0, 300)}`)
+④ MAIN FINANCIAL COPY (center of dark gradient zone, lower 40% of image):
+${textoDaArte}
+  • Render financial figures (ROI%, R$ values) in coral (#E8533A), larger and bolder than surrounding text
+  • All other text in white
+  • Typography: modern premium sans-serif, hierarchy: headline biggest → supporting data → small disclaimer
 
-  const json     = JSON.parse(raw)
-  const designId = json.design?.id
-  if (!designId) throw new Error(`Canva criar design: design_id não retornado. Resposta: ${raw.slice(0, 200)}`)
-  return designId
-}
+⑤ LEGAL DISCLAIMER (very bottom, above the bottom bar):
+  • "Dados estimados. Rentabilidade não garantida. Consulte o material de vendas."
+  • Tiny white text, 9px, semi-transparent (70% opacity)
 
-/** Exporta o design como PNG e retorna a URL de download. */
-async function exportarDesignPNG(designId, token) {
-  const res = await fetch(`${CANVA_BASE}/exports`, {
-    method:  'POST',
-    headers: canvaHeaders(token),
-    body:    JSON.stringify({ design_id: designId, format: { type: 'png', lossless: false } })
-  })
-  const raw = await res.text()
-  if (!res.ok) throw new Error(`Canva export ${res.status}: ${raw.slice(0, 300)}`)
+━━━ STYLE REFERENCES ━━━
+• Overall: cinematic, premium, dark luxury real estate marketing
+• Color palette: very dark overlays + white text + coral (#E8533A) accents
+• Clean grid layout, generous whitespace in the lower copy area
+• The aerial photo must remain the visual hero — do not obscure it completely
 
-  const json  = JSON.parse(raw)
-  const jobId = json.job?.id
-  if (!jobId) throw new Error(`Canva export: job ID não retornado. Resposta: ${raw.slice(0, 200)}`)
-
-  // Polling até URL de download disponível
-  const jobDone = await pollJob(
-    async () => {
-      const r = await fetch(`${CANVA_BASE}/exports/${jobId}`, { headers: canvaHeaders(token) })
-      const j = JSON.parse(await r.text())
-      return { status: j.job?.status, urls: j.job?.urls, error: j.job?.error }
-    },
-    { label: 'export', tentativas: 30, intervalo: 3000 }
-  )
-
-  const url = jobDone.urls?.[0]
-  if (!url) throw new Error('Canva export: URL não retornada após conclusão')
-  return url
-}
-
-// ─── Montagem dos dados do template ──────────────────────────────────────
-
-/**
- * Mapeia os dados do briefing para os campos do brand template Canva.
- * As chaves devem corresponder exatamente aos nomes dos campos no template.
- *
- * Campos padrão do template Seazone:
- *   background_image  → imagem de fundo (asset)
- *   pin_localizacao   → texto do PIN (ex: "(pin) Novo Campeche, Florianópolis/SC")
- *   badge_lancamento  → badge de tipo (ex: "LANÇAMENTO") — omitir se não for lançamento
- *   copy_principal    → copy completo conforme briefing
- *   dado_financeiro   → dado em destaque (ex: "16% ao ano" ou "R$ 5.500/mês")
- *   sufixo_aluguel    → "com aluguel por temporada"
- */
-function montarDadosTemplate(assetId, composicao) {
-  const dados = { _titulo: composicao.nomeEmpreendimento || 'Seazone Criativo' }
-
-  // Imagem de fundo — sempre
-  dados.background_image = { asset_id: assetId }
-
-  // PIN de localização — sempre
-  if (composicao.pin) dados.pin_localizacao = composicao.pin
-
-  // Badge — só se for lançamento (briefing indicar)
-  const badge = composicao.badge || ''
-  if (badge) dados.badge_lancamento = badge
-
-  // Copy principal completo
-  if (composicao.textoDaArte) dados.copy_principal = composicao.textoDaArte
-
-  // Extrai dado financeiro mais relevante do textoDaArte
-  const matchROI     = composicao.textoDaArte?.match(/(\d+[,.]?\d*%)\s*ao ano/)
-  const matchMensal  = composicao.textoDaArte?.match(/R\$\s*[\d.,]+/)
-  if (matchROI)    dados.dado_financeiro = matchROI[0]
-  else if (matchMensal) dados.dado_financeiro = matchMensal[0]
-
-  // Sufixo legal obrigatório
-  dados.sufixo_aluguel = 'com aluguel por temporada'
-
-  // Tracejado até praia — só se briefing mencionar
-  const temPraia = /praia|beach|mar\b|litoral/i.test(
-    [composicao.textoDaArte, composicao.sequenciaVisual].join(' ')
-  )
-  if (temPraia) dados.tracejado_praia = true
-
-  return dados
+━━━ IMPORTANT ━━━
+• Preserve ALL Portuguese text verbatim — do not translate or paraphrase
+• Only include elements listed above — do not add anything not specified
+• Output the final composed image only`
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────
@@ -295,59 +151,48 @@ export default async function handler(req, res) {
   // composicao: { pin, badge, textoDaArte, sequenciaVisual, nomeEmpreendimento }
 
   const openrouterKey = process.env.OPENROUTER_API_KEY
-  const canvaToken    = process.env.CANVA_ACCESS_TOKEN
-  const templateId    = process.env.CANVA_TEMPLATE_ID
-
   if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
-  if (!canvaToken)    return res.status(500).json({ error: 'CANVA_ACCESS_TOKEN não configurada' })
 
   try {
     // 1. Lista imagens do Drive
     let imagens = []
-    let imagemSelecionada = null
     try {
       imagens = await listarImagensDrive()
     } catch (e) {
       console.warn('Drive listing falhou:', e.message)
     }
 
-    // 2. GPT-5 seleciona a foto mais adequada
-    if (imagens.length > 0) {
-      imagemSelecionada = await selecionarImagem(imagens, composicao?.sequenciaVisual || '', openrouterKey)
-    }
-
-    if (!imagemSelecionada) {
+    if (!imagens.length) {
       return res.status(422).json({ error: 'Nenhuma imagem disponível no Drive para composição' })
     }
 
-    // 3. Baixa a imagem do Drive
-    const { buffer, mime } = await baixarImagem(imagemSelecionada)
+    // 2. GPT-5 seleciona a foto mais adequada à sequência visual
+    const imagemSelecionada = await selecionarImagem(
+      imagens,
+      composicao?.sequenciaVisual || '',
+      openrouterKey
+    )
 
-    // 4. Upload para o Canva
-    const assetId = await uploadAssetCanva(buffer, imagemSelecionada.nome, mime, canvaToken)
+    // 3. Baixa a imagem como base64 para enviar ao GPT-5
+    const imagemBase64 = await baixarComoBase64(imagemSelecionada)
 
-    // 5. Cria o design
-    let designId
-    if (templateId) {
-      // Com brand template: composição dinâmica completa
-      const dadosTemplate = montarDadosTemplate(assetId, composicao || {})
-      designId = await autofillDesign(templateId, dadosTemplate, canvaToken)
-    } else {
-      // Sem template: design simples com imagem de fundo
-      console.warn('CANVA_TEMPLATE_ID não configurado — criando design sem composição de texto')
-      designId = await criarDesignSimples(assetId, canvaToken)
-    }
+    // 4. GPT-5 compõe o estático no estilo Seazone usando a foto como base
+    const prompt = montarPromptComposicao(composicao || {})
 
-    // 6. Exporta como PNG
-    const imagemUrl = await exportarDesignPNG(designId, canvaToken)
+    const imagemUrl = await chamarGPT5Imagem([
+      {
+        role: 'user',
+        content: [
+          { type: 'text',      text: prompt },
+          { type: 'image_url', image_url: { url: imagemBase64, detail: 'high' } }
+        ]
+      }
+    ], openrouterKey)
 
     return res.status(200).json({
       imagemUrl,
-      designId,
-      assetId,
       imagemSelecionada: { id: imagemSelecionada.id, nome: imagemSelecionada.nome },
-      totalImagensDrive: imagens.length,
-      usouTemplate: !!templateId
+      totalImagensDrive: imagens.length
     })
   } catch (err) {
     console.error('compor-estatico erro:', err)
