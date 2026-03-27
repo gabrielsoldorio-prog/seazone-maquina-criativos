@@ -32,16 +32,50 @@ async function gerarImagemFal(prompt, falKey) {
   throw new Error('Fal.ai timeout')
 }
 
-// DALL-E 3 (opcional — se OPENAI_API_KEY disponível)
-async function gerarImagemDalle(prompt, openaiKey) {
-  const res = await fetch('https://api.openai.com/v1/images/generations', {
+// GPT-5 via OpenRouter
+async function gerarImagemGPT5(prompt, openrouterKey) {
+  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${openaiKey}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ model: 'dall-e-3', prompt, n: 1, size: '1024x1024', quality: 'standard' })
+    headers: {
+      'Authorization': `Bearer ${openrouterKey}`,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify({
+      model: 'openai/gpt-5',
+      messages: [{ role: 'user', content: `Generate an image: ${prompt}` }],
+      tools: [{ type: 'image_generation' }]
+    })
   })
-  if (!res.ok) throw new Error(`DALL-E 3 ${res.status}: ${await res.text()}`)
+  if (!res.ok) throw new Error(`GPT-5/OpenRouter ${res.status}: ${await res.text()}`)
   const json = await res.json()
-  return json.data?.[0]?.url || null
+
+  const message = json.choices?.[0]?.message
+
+  // Verifica tool_calls com dados de imagem
+  if (message?.tool_calls) {
+    for (const tc of message.tool_calls) {
+      const result = tc.result || tc.output
+      if (result?.url) return result.url
+      if (result?.b64_json) return `data:image/png;base64,${result.b64_json}`
+    }
+  }
+
+  // Verifica content em formato array (multimodal)
+  const content = message?.content
+  if (Array.isArray(content)) {
+    for (const item of content) {
+      if (item.type === 'image_url') return item.image_url?.url
+      if (item.type === 'image') return item.source?.url || item.url
+    }
+  }
+
+  // Fallback: extrai URL de imagem de string de texto
+  if (typeof content === 'string') {
+    const match = content.match(/https?:\/\/[^\s"')]+\.(?:png|jpg|jpeg|webp)[^\s"')\]]*/)
+    if (match) return match[0]
+  }
+
+  throw new Error('GPT-5 não retornou imagem reconhecível')
 }
 
 // ElevenLabs: TTS → base64
@@ -66,9 +100,9 @@ export default async function handler(req, res) {
   const { roteiros } = req.body
   if (!roteiros?.materiais) return res.status(400).json({ error: 'roteiros inválidos' })
 
-  const falKey    = process.env.FAL_API_KEY
-  const elevenKey = process.env.ELEVENLABS_API_KEY
-  const openaiKey = process.env.OPENAI_API_KEY
+  const falKey         = process.env.FAL_API_KEY
+  const elevenKey      = process.env.ELEVENLABS_API_KEY
+  const openrouterKey  = process.env.OPENROUTER_API_KEY
 
   if (!falKey)    return res.status(500).json({ error: 'FAL_API_KEY não configurada' })
   if (!elevenKey) return res.status(500).json({ error: 'ELEVENLABS_API_KEY não configurada' })
@@ -78,23 +112,23 @@ export default async function handler(req, res) {
 
   const resultado = {}
 
-  // 1. Imagem: Fal.ai (primário) + DALL-E 3 (se disponível)
+  // 1. Imagens em paralelo: Fal.ai + GPT-5 via OpenRouter
   await Promise.allSettled([
     gerarImagemFal(prompt, falKey).then(url => { resultado.imagemFal = url }),
-    openaiKey
-      ? gerarImagemDalle(prompt, openaiKey).then(url => { resultado.imagemDalle = url })
+    openrouterKey
+      ? gerarImagemGPT5(prompt, openrouterKey).then(url => { resultado.imagemGPT5 = url })
       : Promise.resolve()
   ]).then(results => {
     results.forEach((r, i) => {
       if (r.status === 'rejected') {
-        if (i === 0) resultado.imagemFalErro = r.reason?.message
-        if (i === 1) resultado.imagemDalleErro = r.reason?.message
+        if (i === 0) resultado.imagemFalErro   = r.reason?.message
+        if (i === 1) resultado.imagemGPT5Erro  = r.reason?.message
       }
     })
   })
 
-  // Melhor imagem = Fal.ai (padrão) — se ambas disponíveis, retorna as duas para o usuário escolher
-  resultado.imagemUrl = resultado.imagemFal || resultado.imagemDalle || null
+  // imagemUrl = Fal.ai por padrão (usuário pode trocar via "Usar esta")
+  resultado.imagemUrl = resultado.imagemFal || resultado.imagemGPT5 || null
 
   // 2. Áudio narrado (estrutura 1)
   const textoNarrado = extrairLocucao(roteiros.materiais?.videoNarrado?.[0]?.cenas)
