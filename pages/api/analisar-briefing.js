@@ -1,3 +1,5 @@
+import { callGemini } from '../../lib/gemini'
+
 export const config = {
   api: { responseLimit: '4mb' },
   maxDuration: 120,
@@ -9,8 +11,8 @@ export default async function handler(req, res) {
   const { linkLovable, linkDrive } = req.body
   if (!linkLovable) return res.status(400).json({ error: 'Link do Lovable é obrigatório' })
 
-  const openrouterKey = process.env.OPENROUTER_API_KEY
-  if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
+  const geminiKey = process.env.GEMINI_API_KEY
+  if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' })
 
   // Tenta buscar conteúdo da página
   let paginaConteudo = ''
@@ -69,7 +71,7 @@ Retorne APENAS um JSON válido com exatamente esta estrutura:
     "valorizacaoEstimada": "X% ao ano"
   },
   "pontosFortesAprovados": ["Diferencial 1", "Diferencial 2", "Diferencial 3"],
-  "imagemPrompt": "Prompt em inglês para geração de imagem via Fal.ai/DALL-E 3. Descreva: vista aérea do bairro/região, render da fachada do empreendimento, paleta sóbria e profissional, dark overlay para contraste de texto, estilo cinematic real estate photography.",
+  "imagemPrompt": "Prompt em inglês para geração de imagem. Descreva: vista aérea do bairro/região, render da fachada do empreendimento, paleta sóbria e profissional, dark overlay para contraste de texto, estilo cinematic real estate photography.",
   "pitch": "Pitch resumido em 2-3 frases do empreendimento",
   "perfilHospede": "Descrição do perfil do hóspede típico e fatores de decisão",
   "resumoRegiao": "Resumo da região, demanda turística e contexto de mercado"
@@ -77,23 +79,7 @@ Retorne APENAS um JSON válido com exatamente esta estrutura:
 
 Se algum dado não estiver disponível no conteúdo, use "A confirmar" para dados financeiros e inferências razoáveis para demais campos.`
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openrouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://seazone.com.br',
-        'X-Title': 'Seazone Máquina de Criativos'
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-opus-4-5',
-        max_tokens: 3000,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          {
-            role: 'user',
-            content: `Analise o briefing deste empreendimento Seazone:
+  const userPrompt = `Analise o briefing deste empreendimento Seazone:
 
 URL Lovable: ${linkLovable}
 Link Google Drive (assets): ${linkDrive || 'não fornecido'}
@@ -102,22 +88,10 @@ Conteúdo extraído da página:
 ${paginaConteudo}
 
 Extraia todas as informações e retorne o JSON estruturado.`
-          }
-        ]
-      })
-    })
 
-    const bodyText = await response.text()
-    if (!response.ok) {
-      throw new Error(`OpenRouter ${response.status}: ${bodyText.slice(0, 300)}`)
-    }
-
-    let json
-    try { json = JSON.parse(bodyText) } catch (e) {
-      throw new Error(`Resposta inválida (não é JSON): ${bodyText.slice(0, 200)}`)
-    }
-    const rawText = json.choices?.[0]?.message?.content
-    if (!rawText) throw new Error('Resposta vazia')
+  try {
+    const rawText = await callGemini({ systemPrompt, userPrompt, geminiKey, maxOutputTokens: 3000 })
+    console.log('analisar-briefing: Gemini respondeu', rawText.slice(0, 100))
 
     const match = rawText.match(/\{[\s\S]*\}/)
     if (!match) throw new Error('JSON não encontrado na resposta')
@@ -126,7 +100,7 @@ Extraia todas as informações e retorne o JSON estruturado.`
     try { data = JSON.parse(match[0]) } catch (e) {
       throw new Error(`JSON do briefing malformado: ${e.message}`)
     }
-    data.linkDrive = linkDrive || ''
+    data.linkDrive   = linkDrive || ''
     data.linkLovable = linkLovable
 
     return res.status(200).json(data)

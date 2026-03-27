@@ -7,6 +7,7 @@
  */
 
 import { gerarEstaticoSharp } from '../../lib/sharp-estatico'
+import { callGemini }         from '../../lib/gemini'
 
 export const config = {
   api: { responseLimit: '12mb' },
@@ -46,22 +47,10 @@ async function gerarAudio(texto, elevenKey) {
 // "trocar 16,4% por 18,2%", "pin: Campeche, Florianópolis - SC").
 // Claude interpreta e retorna os campos atualizados para gerarEstaticoSharp.
 
-async function parsearPinsParaSharp(composicaoOriginal, feedback, openrouterKey) {
-  console.log('[atualizar-midia] interpretando pins com Claude...')
+async function parsearPinsParaSharp(composicaoOriginal, feedback, geminiKey) {
+  console.log('[atualizar-midia] interpretando pins com Gemini...')
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method:  'POST',
-    headers: {
-      'Authorization': `Bearer ${openrouterKey}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model:      'anthropic/claude-opus-4-5',
-      max_tokens: 600,
-      messages: [
-        {
-          role:    'system',
-          content: `Você é um assistente que interpreta feedback e pins de revisão sobre um criativo estático Seazone.
+  const systemPrompt = `Você é um assistente que interpreta feedback e pins de revisão sobre um criativo estático Seazone.
 Dado os parâmetros originais e o feedback do usuário, retorne APENAS um JSON com os parâmetros atualizados.
 
 Campos disponíveis:
@@ -74,38 +63,21 @@ Regras:
 - Altere APENAS os campos mencionados no feedback
 - Mantenha os demais iguais ao original
 - O dado financeiro deve estar embutido em textoDaArte (ex: "16,4% ao ano de retorno líquido com aluguel por temporada")
-- Responda SOMENTE com o JSON, sem explicações`,
-        },
-        {
-          role:    'user',
-          content: `Parâmetros originais da composição:
+- Responda SOMENTE com o JSON, sem explicações`
+
+  const userPrompt = `Parâmetros originais da composição:
 ${JSON.stringify(composicaoOriginal, null, 2)}
 
 Feedback / pins do usuário:
 ${feedback}
 
-Retorne os parâmetros atualizados em JSON:`,
-        },
-      ],
-    }),
-  })
+Retorne os parâmetros atualizados em JSON:`
 
-  const raw = await res.text()
-  console.log('[atualizar-midia] OpenRouter status:', res.status)
+  const content = await callGemini({ systemPrompt, userPrompt, geminiKey, maxOutputTokens: 600, jsonMode: true })
+  console.log('[atualizar-midia] Gemini retornou:', content.slice(0, 200))
 
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${raw.slice(0, 200)}`)
-
-  let json
-  try { json = JSON.parse(raw) } catch {
-    throw new Error(`Resposta OpenRouter não é JSON: ${raw.slice(0, 200)}`)
-  }
-
-  const content = (json.choices?.[0]?.message?.content || '').trim()
-  console.log('[atualizar-midia] Claude retornou:', content.slice(0, 200))
-
-  // Extrai JSON do conteúdo (pode vir com markdown ```json ... ```)
   const match = content.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error(`Claude não retornou JSON: ${content.slice(0, 200)}`)
+  if (!match) throw new Error(`Gemini não retornou JSON: ${content.slice(0, 200)}`)
 
   let params
   try { params = JSON.parse(match[0]) } catch (e) {
@@ -117,43 +89,17 @@ Retorne os parâmetros atualizados em JSON:`,
 
 // ─── Claude: refina locução com feedback ─────────────────────────────────
 
-async function refinarLocucao(locucaoOriginal, feedback, openrouterKey) {
-  console.log('[atualizar-midia] refinando locução com Claude...')
+async function refinarLocucao(locucaoOriginal, feedback, geminiKey) {
+  console.log('[atualizar-midia] refinando locução com Gemini...')
 
-  const res = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method:  'POST',
-    headers: {
-      'Authorization': `Bearer ${openrouterKey}`,
-      'Content-Type':  'application/json',
-    },
-    body: JSON.stringify({
-      model:      'anthropic/claude-opus-4-5',
-      max_tokens: 600,
-      messages: [
-        {
-          role:    'system',
-          content: `Você é um especialista em criativos de performance para a Seazone.
+  const systemPrompt = `Você é um especialista em criativos de performance para a Seazone.
 Dado uma locução original e um feedback, gere a locução melhorada em português.
 Regras Seazone: sem termos proibidos, sufixo "com aluguel por temporada" em dados financeiros, PIN de localização no início.
-Responda APENAS com o texto da locução melhorada, sem explicações.`,
-        },
-        {
-          role:    'user',
-          content: `Locução original:\n${locucaoOriginal}\n\nFeedback:\n${feedback}\n\nLocução melhorada:`,
-        },
-      ],
-    }),
-  })
+Responda APENAS com o texto da locução melhorada, sem explicações.`
 
-  const raw = await res.text()
-  if (!res.ok) throw new Error(`OpenRouter ${res.status}: ${raw.slice(0, 200)}`)
+  const userPrompt = `Locução original:\n${locucaoOriginal}\n\nFeedback:\n${feedback}\n\nLocução melhorada:`
 
-  let json
-  try { json = JSON.parse(raw) } catch {
-    throw new Error(`Resposta OpenRouter não é JSON: ${raw.slice(0, 200)}`)
-  }
-
-  return (json.choices?.[0]?.message?.content || '').trim()
+  return callGemini({ systemPrompt, userPrompt, geminiKey, maxOutputTokens: 600 })
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────
@@ -183,10 +129,10 @@ async function _handler(req, res) {
   if (!tipo)     return res.status(400).json({ erro: 'tipo é obrigatório (estatico | narrado | apresentadora)' })
   if (!feedback) return res.status(400).json({ erro: 'feedback é obrigatório' })
 
-  const elevenKey     = process.env.ELEVENLABS_API_KEY
-  const openrouterKey = process.env.OPENROUTER_API_KEY
+  const elevenKey  = process.env.ELEVENLABS_API_KEY
+  const geminiKey  = process.env.GEMINI_API_KEY
 
-  if (!openrouterKey) return res.status(500).json({ erro: 'OPENROUTER_API_KEY não configurada' })
+  if (!geminiKey) return res.status(500).json({ erro: 'GEMINI_API_KEY não configurada' })
 
   console.log('[atualizar-midia] ▶ tipo:', tipo)
   console.log('[atualizar-midia] feedback:', feedback.slice(0, 120))
@@ -204,7 +150,7 @@ async function _handler(req, res) {
     console.log('[atualizar-midia] composicaoBase:', JSON.stringify(composicaoBase).slice(0, 200))
 
     // Interpreta os pins como instruções para atualizar os campos Sharp
-    const composicaoAtualizada = await parsearPinsParaSharp(composicaoBase, feedback, openrouterKey)
+    const composicaoAtualizada = await parsearPinsParaSharp(composicaoBase, feedback, geminiKey)
 
     // Garante que campos obrigatórios existem (fallback para base)
     const composicaoFinal = {
@@ -228,7 +174,7 @@ async function _handler(req, res) {
   if (tipo === 'narrado' || tipo === 'apresentadora') {
     if (!elevenKey) return res.status(500).json({ erro: 'ELEVENLABS_API_KEY não configurada' })
 
-    const locucaoRefinada = await refinarLocucao(locucaoOriginal || '', feedback, openrouterKey)
+    const locucaoRefinada = await refinarLocucao(locucaoOriginal || '', feedback, geminiKey)
     const novoAudio       = await gerarAudio(locucaoRefinada, elevenKey)
 
     return res.status(200).json({

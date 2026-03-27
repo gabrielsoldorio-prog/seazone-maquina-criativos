@@ -77,6 +77,8 @@ Responda APENAS com JSON válido:
   }
 }`
 
+import { callGemini } from '../../lib/gemini'
+
 export const config = {
   api: { responseLimit: '4mb' },
   maxDuration: 120,
@@ -88,47 +90,26 @@ export default async function handler(req, res) {
   const { briefing } = req.body
   if (!briefing) return res.status(400).json({ error: 'Briefing é obrigatório' })
 
-  const openrouterKey = process.env.OPENROUTER_API_KEY
-  if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
+  const geminiKey = process.env.GEMINI_API_KEY
+  if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' })
 
-  try {
-    const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openrouterKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'https://seazone.com.br',
-        'X-Title': 'Seazone Máquina de Criativos'
-      },
-      body: JSON.stringify({
-        model: 'anthropic/claude-opus-4-5',
-        max_tokens: 8000,
-        response_format: { type: 'json_object' },
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          {
-            role: 'user',
-            content: `Gere os 9 roteiros completos para o seguinte empreendimento Seazone:
+  const userPrompt = `Gere os 9 roteiros completos para o seguinte empreendimento Seazone:
 
 ${JSON.stringify(briefing, null, 2)}
 
 Siga rigorosamente as regras do sistema. Respeite os Do's e Don'ts específicos do briefing.
 Após gerar os roteiros, avalie seu próprio trabalho com o agente nota (0-10) e o agente revisor (checklist).
 Responda apenas com o JSON.`
-          }
-        ]
-      })
+
+  try {
+    const rawText = await callGemini({
+      systemPrompt:    SYSTEM_PROMPT,
+      userPrompt,
+      geminiKey,
+      maxOutputTokens: 8000,
+      jsonMode:        true,
     })
-
-    const bodyText = await response.text()
-    if (!response.ok) throw new Error(`OpenRouter ${response.status}: ${bodyText.slice(0, 300)}`)
-
-    let json
-    try { json = JSON.parse(bodyText) } catch (e) {
-      throw new Error(`Resposta inválida (não é JSON): ${bodyText.slice(0, 200)}`)
-    }
-    const rawText = json.choices?.[0]?.message?.content
-    if (!rawText) throw new Error('Resposta vazia do modelo')
+    console.log('gerar-criativos: Gemini respondeu', rawText.slice(0, 80))
 
     const parsed = parseRobust(rawText)
     return res.status(200).json(parsed)

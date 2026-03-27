@@ -92,11 +92,9 @@ async function _handler(req, res) {
     return res.status(400).json({ erro: 'Campo "roteiros" com "materiais" é obrigatório' })
   }
 
-  const elevenKey     = process.env.ELEVENLABS_API_KEY
-  const openrouterKey = process.env.OPENROUTER_API_KEY
+  const elevenKey = process.env.ELEVENLABS_API_KEY
 
-  if (!elevenKey)     return res.status(500).json({ erro: 'ELEVENLABS_API_KEY não configurada' })
-  if (!openrouterKey) return res.status(500).json({ erro: 'OPENROUTER_API_KEY não configurada' })
+  if (!elevenKey) return res.status(500).json({ erro: 'ELEVENLABS_API_KEY não configurada' })
 
   console.log('[gerar-midias] ▶ iniciando — empreendimento:', roteiros.empreendimento)
 
