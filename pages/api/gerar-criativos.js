@@ -98,6 +98,7 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'anthropic/claude-opus-4-5',
         max_tokens: 8000,
+        response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
@@ -118,14 +119,50 @@ Responda apenas com o JSON.`
 
     const json = await response.json()
     const rawText = json.choices?.[0]?.message?.content
-    if (!rawText) throw new Error('Resposta vazia')
+    if (!rawText) throw new Error('Resposta vazia do modelo')
 
-    const match = rawText.match(/\{[\s\S]*\}/)
-    if (!match) throw new Error('JSON não encontrado')
-
-    return res.status(200).json(JSON.parse(match[0]))
+    const parsed = parseRobust(rawText)
+    return res.status(200).json(parsed)
   } catch (err) {
     console.error('gerar-criativos erro:', err)
     return res.status(500).json({ error: err.message })
+  }
+}
+
+/**
+ * Tenta parsear JSON com pipeline de reparo progressivo.
+ * Lida com: markdown fences, caracteres de controle, vírgulas trailing.
+ */
+function parseRobust(raw) {
+  // 1. Remove markdown code fences (```json ... ```)
+  let text = raw
+    .replace(/^```(?:json)?\s*/im, '')
+    .replace(/\s*```$/im, '')
+    .trim()
+
+  // 2. Extrai o bloco JSON mais externo
+  const start = text.indexOf('{')
+  const end   = text.lastIndexOf('}')
+  if (start === -1 || end === -1) throw new Error('Nenhum bloco JSON encontrado na resposta')
+  text = text.slice(start, end + 1)
+
+  // 3. Tentativa direta (caminho feliz)
+  try { return JSON.parse(text) } catch (_) {}
+
+  // 4. Remove caracteres de controle que não são \n \r \t
+  text = text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
+  try { return JSON.parse(text) } catch (_) {}
+
+  // 5. Remove vírgulas trailing antes de } ou ]
+  text = text.replace(/,(\s*[}\]])/g, '$1')
+  try { return JSON.parse(text) } catch (_) {}
+
+  // 6. Converte quebras de linha literais dentro de strings em \n escapado
+  text = text.replace(/"((?:[^"\\]|\\.)*)"/g, (_, inner) => {
+    const fixed = inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
+    return `"${fixed}"`
+  })
+  try { return JSON.parse(text) } catch (e) {
+    throw new Error(`JSON malformado após tentativas de reparo: ${e.message}`)
   }
 }
