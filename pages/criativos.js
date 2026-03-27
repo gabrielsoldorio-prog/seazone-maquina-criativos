@@ -178,9 +178,10 @@ export default function Criativos() {
 
   const mat = criativos.materiais || {}
   const mapaAbas = {
-    estatico:      { materiais: mat.estatico,           tipo: 'estatico' },
-    narrado:       { materiais: mat.videoNarrado,        tipo: 'narrado' },
-    apresentadora: { materiais: mat.videoApresentadora,  tipo: 'apresentadora' },
+    // Estáticos: apenas Estrutura 1 por enquanto (composição visual por vez)
+    estatico:      { materiais: (mat.estatico || []).slice(0, 1),          tipo: 'estatico' },
+    narrado:       { materiais: mat.videoNarrado,                           tipo: 'narrado' },
+    apresentadora: { materiais: mat.videoApresentadora,                     tipo: 'apresentadora' },
   }
   const abaAtual = mapaAbas[abaAtiva]
 
