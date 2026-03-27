@@ -22,7 +22,7 @@ function Spinner() {
 }
 
 // ─── Card de material individual ──────────────────────────────────────────
-function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
+function MaterialCard({ tipo, estrutura, material, midia, composicao, onAtualizar }) {
   const locucaoOriginal = tipo !== 'estatico'
     ? (material?.cenas || []).map(c => c.locucao || '').filter(Boolean).join('\n\n')
     : ''
@@ -50,7 +50,7 @@ function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
             alt={`Estático estrutura ${estrutura}`}
             tipo="estatico"
             estrutura={estrutura}
-            promptOriginal={midia?.promptUsado || ''}
+            composicao={composicao}
             onNovosDados={onAtualizar}
           />
 
@@ -227,7 +227,7 @@ export default function Criativos() {
           {loadingMidias && (
             <div style={{ background: '#0f0f14', border: `1px solid ${C.border}`, borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
               <Spinner />
-              <span style={{ color: C.coral, fontSize: '13px', fontWeight: '500' }}>Gerando imagem via GPT-5 e áudios via ElevenLabs...</span>
+              <span style={{ color: C.coral, fontSize: '13px', fontWeight: '500' }}>Gerando imagem via Sharp e áudios via ElevenLabs...</span>
             </div>
           )}
           {erroMidias && (
@@ -266,6 +266,14 @@ export default function Criativos() {
               estrutura={material.estrutura || idx + 1}
               material={material}
               midia={midias}
+              composicao={abaAtual.tipo === 'estatico' ? (
+                midias?.composicaoUsada || {
+                  nomeEmpreendimento: criativos.empreendimento || '',
+                  pin:                criativos.localizacao    || '',
+                  badge:              'LANÇAMENTO',
+                  textoDaArte:        material.textoDaArte     || '',
+                }
+              ) : null}
               onAtualizar={(dados) => handleAtualizarMidia(abaAtual.tipo, dados)}
             />
           ))}

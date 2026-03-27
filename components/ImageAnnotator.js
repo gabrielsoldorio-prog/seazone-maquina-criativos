@@ -6,7 +6,7 @@ function Spinner() {
   return <span style={{ width: '12px', height: '12px', border: '2px solid #333', borderTop: `2px solid ${C.coral}`, borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite', flexShrink: 0 }} />
 }
 
-export default function ImageAnnotator({ src, alt, tipo = 'estatico', estrutura, promptOriginal, onNovosDados }) {
+export default function ImageAnnotator({ src, alt, tipo = 'estatico', estrutura, composicao, promptOriginal, onNovosDados }) {
   const [pins, setPins]           = useState([])
   const [ativoId, setAtivoId]     = useState(null)
   const [atualizando, setAtu]     = useState(false)
@@ -44,7 +44,7 @@ export default function ImageAnnotator({ src, alt, tipo = 'estatico', estrutura,
       const res = await fetch('/api/atualizar-midia', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tipo, feedback, estrutura, promptOriginal: promptOriginal || '', locucaoOriginal: '' })
+        body: JSON.stringify({ tipo, feedback, estrutura, composicao: composicao || undefined, promptOriginal: promptOriginal || '', locucaoOriginal: '' })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)

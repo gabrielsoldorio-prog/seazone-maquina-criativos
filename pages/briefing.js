@@ -46,6 +46,11 @@ export default function Briefing() {
     }
   }, [])
 
+  // Auto-aprovação: dispara geração de criativos assim que o briefing carrega
+  useEffect(() => {
+    if (briefing && !loading) confirmarEGerar()
+  }, [briefing])
+
   async function confirmarEGerar() {
     setLoading(true)
     setErro(null)

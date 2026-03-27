@@ -63,7 +63,8 @@ async function gerarEstatico(roteiros) {
   console.log('[gerar-midias] gerarEstatico — empreendimento:', composicao.nomeEmpreendimento)
   console.log('[gerar-midias] textoDaArte (início):', composicao.textoDaArte.slice(0, 120))
 
-  return gerarEstaticoSharp(composicao)
+  const imagemUrl = await gerarEstaticoSharp(composicao)
+  return { imagemUrl, composicaoUsada: composicao }
 }
 
 // ─── Handler ──────────────────────────────────────────────────────────────
@@ -104,7 +105,9 @@ async function _handler(req, res) {
   // 1. Imagem estática via Sharp
   try {
     console.log('[gerar-midias] 1/3 — gerando imagem estática (Sharp)...')
-    resultado.imagemUrl = await gerarEstatico(roteiros)
+    const { imagemUrl, composicaoUsada } = await gerarEstatico(roteiros)
+    resultado.imagemUrl       = imagemUrl
+    resultado.composicaoUsada = composicaoUsada
     console.log('[gerar-midias] 1/3 ✓ imagem gerada')
   } catch (e) {
     console.error('[gerar-midias] 1/3 ✗ erro na imagem:', e.message)
