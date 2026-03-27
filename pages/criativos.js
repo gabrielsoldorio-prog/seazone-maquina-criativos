@@ -58,13 +58,6 @@ function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
             <p style={{ margin: 0, fontSize: '11px', color: '#f87171' }}>Erro ao gerar imagem: {midia.imagemErro}</p>
           )}
 
-          {material?.textoDaArte && (
-            <div style={{ background: '#0d0d14', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '14px' }}>
-              <p style={{ margin: '0 0 6px', color: C.label, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Texto da Arte</p>
-              <p style={{ margin: 0, color: C.text, fontSize: '14px', lineHeight: '1.7', whiteSpace: 'pre-line', fontWeight: '500' }}>{material.textoDaArte}</p>
-            </div>
-          )}
-
           {material?.referenciaVisual && (
             <div style={{ background: '#0d0d14', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '14px' }}>
               <p style={{ margin: '0 0 6px', color: C.label, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Referência Visual</p>
@@ -96,14 +89,29 @@ function MaterialCard({ tipo, estrutura, material, midia, onAtualizar }) {
           {material?.cenas && <CenaTable cenas={material.cenas} />}
         </div>
       )}
+    </div>
+  )
+}
 
-      {/* Legenda */}
-      {material?.legenda && (
-        <div style={{ marginTop: '14px', background: '#0d0d14', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '14px' }}>
-          <p style={{ margin: '0 0 6px', color: C.label, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Legenda do Post</p>
-          <p style={{ margin: 0, color: C.sub, fontSize: '13px', lineHeight: '1.6', whiteSpace: 'pre-line' }}>{material.legenda}</p>
-        </div>
-      )}
+// ─── Legenda unificada por aba ─────────────────────────────────────────────
+function LegendaAba({ valor, onChange }) {
+  return (
+    <div style={{ marginTop: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '20px' }}>
+      <p style={{ margin: '0 0 10px', color: C.label, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+        Legenda do Post
+      </p>
+      <textarea
+        value={valor}
+        onChange={e => onChange(e.target.value)}
+        placeholder="Legenda gerada para este material..."
+        rows={6}
+        style={{
+          width: '100%', background: '#0d0d14', border: `1px solid ${C.border}`,
+          borderRadius: '8px', padding: '12px 14px', color: C.text,
+          fontSize: '13px', lineHeight: '1.65', resize: 'vertical',
+          fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box'
+        }}
+      />
     </div>
   )
 }
@@ -116,6 +124,11 @@ export default function Criativos() {
   const [abaAtiva, setAbaAtiva] = useState('estatico')
   const [loadingMidias, setLoadingMidias] = useState(false)
   const [erroMidias, setErroMidias] = useState(null)
+  const [legendas, setLegendas] = useState({ estatico: '', narrado: '', apresentadora: '' })
+
+  function setLegenda(aba, valor) {
+    setLegendas(prev => ({ ...prev, [aba]: valor }))
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -123,6 +136,14 @@ export default function Criativos() {
     if (!data) { router.push('/'); return }
     const parsed = JSON.parse(data)
     setCriativos(parsed)
+    // Pré-preenche legendas com o primeiro material que tiver legenda em cada aba
+    const mat = parsed.materiais || {}
+    const primeiraLegenda = arr => (arr || []).find(m => m.legenda)?.legenda || ''
+    setLegendas({
+      estatico:      primeiraLegenda(mat.estatico),
+      narrado:       primeiraLegenda(mat.videoNarrado),
+      apresentadora: primeiraLegenda(mat.videoApresentadora),
+    })
     gerarMidias(parsed)
   }, [])
 
@@ -247,6 +268,12 @@ export default function Criativos() {
               onAtualizar={(dados) => handleAtualizarMidia(abaAtual.tipo, dados)}
             />
           ))}
+
+          {/* Legenda unificada da aba */}
+          <LegendaAba
+            valor={legendas[abaAtiva]}
+            onChange={v => setLegenda(abaAtiva, v)}
+          />
 
           {/* Agentes (nota + revisor) */}
           <AgenteCard agentes={criativos.agentes} />
