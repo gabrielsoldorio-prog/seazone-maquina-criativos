@@ -130,9 +130,9 @@ async function _handler(req, res) {
   if (!feedback) return res.status(400).json({ erro: 'feedback é obrigatório' })
 
   const elevenKey = process.env.ELEVENLABS_API_KEY
-  const geminiKey = process.env.GEMINI_API_KEY
+  const geminiKey = process.env.GROQ_API_KEY
 
-  if (!geminiKey) return res.status(500).json({ erro: 'GEMINI_API_KEY não configurada' })
+  if (!geminiKey) return res.status(500).json({ erro: 'GROQ_API_KEY não configurada' })
 
   console.log('[atualizar-midia] ▶ tipo:', tipo)
   console.log('[atualizar-midia] feedback:', feedback.slice(0, 120))

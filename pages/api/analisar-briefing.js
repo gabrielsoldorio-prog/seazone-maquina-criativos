@@ -11,8 +11,8 @@ export default async function handler(req, res) {
   const { linkLovable, linkDrive } = req.body
   if (!linkLovable) return res.status(400).json({ error: 'Link do Lovable é obrigatório' })
 
-  const geminiKey = process.env.GEMINI_API_KEY
-  if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' })
+  const geminiKey = process.env.GROQ_API_KEY
+  if (!geminiKey) return res.status(500).json({ error: 'GROQ_API_KEY não configurada' })
 
   // Tenta buscar conteúdo da página
   let paginaConteudo = ''

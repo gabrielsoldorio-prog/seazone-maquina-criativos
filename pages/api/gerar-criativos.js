@@ -90,8 +90,8 @@ export default async function handler(req, res) {
   const { briefing } = req.body
   if (!briefing) return res.status(400).json({ error: 'Briefing é obrigatório' })
 
-  const geminiKey = process.env.GEMINI_API_KEY
-  if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' })
+  const geminiKey = process.env.GROQ_API_KEY
+  if (!geminiKey) return res.status(500).json({ error: 'GROQ_API_KEY não configurada' })
 
   const userPrompt = `Gere os 9 roteiros completos para o seguinte empreendimento Seazone:
 
