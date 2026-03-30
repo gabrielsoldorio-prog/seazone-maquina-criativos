@@ -5,7 +5,7 @@ import Layout from '../components/Layout'
 import AgentPanel from '../components/AgentPanel'
 import VariacaoCard from '../components/VariacaoCard'
 import { useToast } from '../components/Toast'
-import { Loader, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -17,6 +17,12 @@ function agruparPorEstrutura(materiais) {
     grupos[e].push(m)
   })
   return grupos
+}
+
+function extrairFolderId(url) {
+  if (!url) return null
+  const m = url.match(/\/folders\/([a-zA-Z0-9_-]+)/)
+  return m?.[1] || null
 }
 
 // ── Skeleton ──────────────────────────────────────────────────────────────────
@@ -42,7 +48,7 @@ function SkeletonCards() {
 
 // ── EstruturaSection ──────────────────────────────────────────────────────────
 
-function EstruturaSection({ numero, variacoes, tipo, score, imagemPrompt, loading }) {
+function EstruturaSection({ numero, variacoes, tipo, driveImagens, loading }) {
   return (
     <section className="mb-10">
       <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Estrutura {numero}</h2>
@@ -55,8 +61,7 @@ function EstruturaSection({ numero, variacoes, tipo, score, imagemPrompt, loadin
               key={v.variacao ?? i}
               variacao={v}
               tipo={tipo}
-              score={score}
-              imagemPrompt={imagemPrompt}
+              driveImagens={driveImagens}
             />
           ))}
         </div>
@@ -81,15 +86,37 @@ export default function Criativos() {
   const router   = useRouter()
   const addToast = useToast()
 
-  const [criativos, setCriativos] = useState(null)
-  const [abaAtiva,  setAbaAtiva]  = useState('estatico')
+  const [criativos,    setCriativos]    = useState(null)
+  const [driveImagens, setDriveImagens] = useState([])
+  const [abaAtiva,     setAbaAtiva]     = useState('estatico')
 
+  // ── Carrega criativos do localStorage ────────────────────────────────────
   useEffect(() => {
     if (typeof window === 'undefined') return
     const data = localStorage.getItem('criativos')
     if (!data) { router.push('/'); return }
     setCriativos(JSON.parse(data))
   }, [])
+
+  // ── Busca imagens do Drive quando criativos são carregados ────────────────
+  useEffect(() => {
+    if (!criativos) return
+
+    const briefingRaw = typeof window !== 'undefined' ? localStorage.getItem('briefing') : null
+    const briefing    = briefingRaw ? JSON.parse(briefingRaw) : null
+    const folderId    = extrairFolderId(briefing?.linkDrive || '')
+    if (!folderId) return
+
+    fetch(`/api/drive-imagens?folderId=${folderId}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.imagens?.length) {
+          setDriveImagens(data.imagens)
+          addToast(`${data.imagens.length} imagens do Drive carregadas`)
+        }
+      })
+      .catch(() => {}) // silently ignore Drive fetch errors
+  }, [criativos])
 
   if (!criativos) {
     return (
@@ -121,9 +148,6 @@ export default function Criativos() {
     ...(mat.videoApresentadora || []),
   ].length
 
-  const overallScore  = criativos.agentes?.nota ?? null
-  const imagemPrompt  = criativos.imagemPrompt  || null
-
   return (
     <>
       <Head>
@@ -141,9 +165,13 @@ export default function Criativos() {
               <span className="text-sm text-[#94A3B8] ml-1">materiais gerados</span>
             </div>
             <div className="h-5 w-px bg-[#E2E8F0]" />
-            <div className="text-sm text-[#64748B]">
-              3 formatos × 3 estruturas × 5 variações
-            </div>
+            <div className="text-sm text-[#64748B]">3 formatos × 3 estruturas × 5 variações</div>
+            {driveImagens.length > 0 && (
+              <>
+                <div className="h-5 w-px bg-[#E2E8F0]" />
+                <div className="text-xs text-green-600 font-medium">{driveImagens.length} imagens Drive</div>
+              </>
+            )}
           </div>
           <button
             onClick={() => router.push('/')}
@@ -179,13 +207,12 @@ export default function Criativos() {
             numero={e}
             variacoes={gruposAtivos[e] || []}
             tipo={abaAtiva}
-            score={overallScore}
-            imagemPrompt={imagemPrompt}
+            driveImagens={driveImagens}
             loading={false}
           />
         ))}
 
-        {/* Agent Panel — inline */}
+        {/* Agent Panel inline */}
         <section className="mt-4 mb-8">
           <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Agentes</h2>
           <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">

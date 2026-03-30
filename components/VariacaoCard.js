@@ -1,7 +1,32 @@
-import { useState, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { ChevronDown, ChevronUp, Copy, Download, Video, Loader, X, FileImage, Maximize2 } from 'lucide-react'
 
+// ── helpers ───────────────────────────────────────────────────────────────────
+
+const DRIVE_KW = [
+  { tags: ['rooftop', 'piscina', 'cobertura', 'terraço'],          rv: ['rooftop', 'piscina', 'cobertura'] },
+  { tags: ['fachada', 'render', 'frente', 'front', 'facade'],      rv: ['fachada', 'render', 'frente'] },
+  { tags: ['aérea', 'aerea', 'drone', 'aerial', 'fly', 'topo'],    rv: ['aérea', 'aerea', 'drone', 'vista aérea', 'aerial'] },
+  { tags: ['praia', 'mar', 'beach', 'sea', 'ocean', 'litoral'],    rv: ['praia', 'mar', 'beach'] },
+  { tags: ['rua', 'street', 'acesso', 'access', 'entry'],          rv: ['rua', 'street', 'acesso'] },
+]
+
+function selecionarImagem(referenciaVisual, driveImagens) {
+  if (!driveImagens?.length) return null
+  const rv = (referenciaVisual || '').toLowerCase()
+
+  for (const g of DRIVE_KW) {
+    if (g.rv.some(p => rv.includes(p))) {
+      const found = driveImagens.find(img => g.tags.some(t => img.nome?.toLowerCase().includes(t)))
+      if (found) return found.url
+    }
+  }
+  // Fallback: primeiro disponível
+  return driveImagens[0]?.url || null
+}
+
 // ── Field ─────────────────────────────────────────────────────────────────────
+
 function Field({ label, value, onChange, rows = 3 }) {
   return (
     <div className="mb-4">
@@ -19,8 +44,11 @@ function Field({ label, value, onChange, rows = 3 }) {
 }
 
 // ── VideoModal ────────────────────────────────────────────────────────────────
-function VideoModal({ variacao, tipo, campos, setCampos, setCena, videoUrl, videoStatus, videoProgress, onGerarVideo, onClose }) {
+
+function VideoModal({ variacao, tipo, campos, setCampos, setCena, videoUrl, videoStatus, videoProgress, onClose }) {
   const [dur, setDur] = useState(variacao.duracao || '30-40s')
+  const elapsed = Math.round((videoProgress / 100) * 90)
+  const remaining = Math.max(0, 90 - elapsed)
 
   return (
     <div
@@ -53,9 +81,7 @@ function VideoModal({ variacao, tipo, campos, setCampos, setCena, videoUrl, vide
                 key={d}
                 onClick={() => setDur(d)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                  dur === d
-                    ? 'bg-[#E85D3A] text-white'
-                    : 'bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0] hover:border-[#E85D3A]'
+                  dur === d ? 'bg-[#E85D3A] text-white' : 'bg-[#F8FAFC] text-[#64748B] border border-[#E2E8F0] hover:border-[#E85D3A]'
                 }`}
               >
                 {d}
@@ -63,34 +89,34 @@ function VideoModal({ variacao, tipo, campos, setCampos, setCena, videoUrl, vide
             ))}
           </div>
 
-          {/* Video player or placeholder */}
+          {/* Video player or progress */}
           {videoUrl ? (
             <video controls className="w-full rounded-xl mb-5 border border-[#E2E8F0]">
               <source src={videoUrl} type="video/mp4" />
             </video>
           ) : (
-            <div className="bg-[#F8FAFC] border border-dashed border-[#E2E8F0] rounded-xl h-44 flex flex-col items-center justify-center mb-5 gap-2">
+            <div className="bg-[#F8FAFC] border border-dashed border-[#E2E8F0] rounded-xl py-8 flex flex-col items-center justify-center mb-5 gap-3">
               {videoStatus === 'loading' ? (
                 <>
-                  <Loader size={20} color="#E85D3A" style={{ animation: 'spin 1s linear infinite' }} />
-                  <span className="text-xs text-[#94A3B8]">Gerando vídeo… {videoProgress}%</span>
-                  <div className="w-40 h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
-                    <div className="h-full bg-[#E85D3A] rounded-full transition-all duration-500" style={{ width: `${videoProgress}%` }} />
+                  <Loader size={22} color="#E85D3A" style={{ animation: 'spin 1s linear infinite' }} />
+                  <div className="text-center">
+                    <p className="text-sm text-[#64748B] font-medium">Gerando vídeo via Kling AI…</p>
+                    <p className="text-xs text-[#94A3B8] mt-0.5">~{remaining}s restantes</p>
                   </div>
+                  <div className="w-56 h-2 bg-[#E2E8F0] rounded-full overflow-hidden">
+                    <div className="h-full bg-[#E85D3A] rounded-full transition-all duration-700" style={{ width: `${videoProgress}%` }} />
+                  </div>
+                  <p className="text-xs text-[#94A3B8]">{videoProgress}%</p>
+                </>
+              ) : videoStatus === 'error' ? (
+                <>
+                  <Video size={24} color="#94A3B8" />
+                  <p className="text-xs text-red-500">Falha na geração. Tente novamente mais tarde.</p>
                 </>
               ) : (
                 <>
                   <Video size={24} color="#94A3B8" />
-                  <span className="text-xs text-[#94A3B8]">Nenhum vídeo gerado</span>
-                  <button
-                    onClick={onGerarVideo}
-                    className="mt-1 flex items-center gap-1.5 px-4 py-2 bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-semibold rounded-lg transition-colors"
-                  >
-                    <Video size={12} /> Gerar Vídeo
-                  </button>
-                  {videoStatus === 'error' && (
-                    <span className="text-xs text-red-500 mt-1">Erro. Tente novamente.</span>
-                  )}
+                  <p className="text-xs text-[#94A3B8]">Geração em andamento em segundo plano…</p>
                 </>
               )}
             </div>
@@ -111,23 +137,14 @@ function VideoModal({ variacao, tipo, campos, setCampos, setCena, videoUrl, vide
                     value={cena[field] || ''}
                     onChange={e => setCena(i, field, e.target.value)}
                     rows={rows}
-                    className="w-full border border-[#E2E8F0] rounded-lg p-2.5 text-sm text-[#0F172A] resize-y focus:outline-none focus:ring-2 focus:ring-[#E85D3A] transition-shadow bg-white"
+                    className="w-full border border-[#E2E8F0] rounded-lg p-2.5 text-sm text-[#0F172A] resize-y focus:outline-none focus:ring-2 focus:ring-[#E85D3A] bg-white"
                   />
                 </div>
               ))}
             </div>
           ))}
 
-          {/* Legenda */}
-          <div>
-            <label className="block text-xs font-semibold text-[#94A3B8] uppercase tracking-wider mb-1.5">Legenda</label>
-            <textarea
-              value={campos.legenda || ''}
-              onChange={e => setCampos(p => ({ ...p, legenda: e.target.value }))}
-              rows={4}
-              className="w-full border border-[#E2E8F0] rounded-lg p-3 text-sm text-[#0F172A] resize-y focus:outline-none focus:ring-2 focus:ring-[#E85D3A] transition-shadow bg-white"
-            />
-          </div>
+          <Field label="Legenda" value={campos.legenda || ''} onChange={v => setCampos(p => ({ ...p, legenda: v }))} rows={4} />
         </div>
       </div>
     </div>
@@ -135,6 +152,7 @@ function VideoModal({ variacao, tipo, campos, setCampos, setCena, videoUrl, vide
 }
 
 // ── CanvaEditor ───────────────────────────────────────────────────────────────
+
 const CANVA_ZONES = [
   { id: 'pin',      label: 'PIN / Localização', top: '4%',  left: '3%', right: '50%', height: '9%' },
   { id: 'headline', label: 'Headline',           top: '55%', left: '3%', right: '3%',  height: '16%' },
@@ -223,14 +241,16 @@ function CanvaEditor({ imageUrl, campos, setCampos }) {
 }
 
 // ── VariacaoCard ──────────────────────────────────────────────────────────────
-export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
+
+export default function VariacaoCard({ variacao, tipo, driveImagens }) {
   const [expanded,      setExpanded]      = useState(false)
   const [showModal,     setShowModal]     = useState(false)
   const [imageUrl,      setImageUrl]      = useState(null)
-  const [imageLoading,  setImageLoading]  = useState(false)
   const [videoUrl,      setVideoUrl]      = useState(null)
-  const [videoStatus,   setVideoStatus]   = useState(null)
+  const [videoStatus,   setVideoStatus]   = useState(null) // null | 'loading' | 'done' | 'error'
   const [videoProgress, setVideoProgress] = useState(0)
+  const videoStarted = useRef(false)
+  const pollRef      = useRef(null)
 
   const [campos, setCampos] = useState(() => {
     if (tipo === 'estatico') {
@@ -250,6 +270,87 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
   const isLonga = variacao.tipo !== 'curta'
   const duracao = variacao.duracao || (isLonga ? '30-40s' : '10-20s')
   const isVideo = tipo !== 'estatico'
+
+  // ── Auto-load Drive image for estáticos ──────────────────────────────────
+  useEffect(() => {
+    if (tipo !== 'estatico') return
+    const url = selecionarImagem(campos.referenciaVisual, driveImagens)
+    if (url) setImageUrl(url)
+  }, [driveImagens, tipo])
+
+  // ── Auto-start video generation (staggered by variation index) ────────────
+  useEffect(() => {
+    if (!isVideo) return
+    if (videoStarted.current) return
+    videoStarted.current = true
+
+    // Stagger: E1V1=0s, E1V2=3s, ..., E3V5=42s
+    const idx   = ((variacao.estrutura - 1) * 5) + ((variacao.variacao - 1))
+    const delay = idx * 3000
+    const t     = setTimeout(() => iniciarGeracaoVideo(), delay)
+    return () => { clearTimeout(t); clearInterval(pollRef.current) }
+  }, [])
+
+  async function iniciarGeracaoVideo() {
+    if (videoStatus === 'loading' || videoStatus === 'done') return
+    setVideoStatus('loading')
+    setVideoProgress(5)
+
+    const prompt = (campos.cenas || []).map(c => c.cena).filter(Boolean).join('. ')
+      || variacao.imagemPrompt || 'Real estate property promotional video Brazil, modern architecture, luxury amenities'
+
+    try {
+      const res  = await fetch('/api/gerar-video', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body:    JSON.stringify({ prompt }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.erro || 'Erro ao enviar job')
+
+      const { requestId } = data
+      setVideoProgress(15)
+
+      // Simula progresso enquanto aguarda Kling (~60-90s)
+      let simProgress = 15
+      const simTick = setInterval(() => {
+        simProgress = Math.min(simProgress + 1, 88)
+        setVideoProgress(simProgress)
+      }, 800)
+
+      pollRef.current = setInterval(async () => {
+        try {
+          const sr    = await fetch(`/api/gerar-video?requestId=${requestId}`)
+          const sData = await sr.json()
+
+          if (sData.status === 'COMPLETED') {
+            clearInterval(pollRef.current)
+            clearInterval(simTick)
+            setVideoUrl(sData.url)
+            setVideoStatus('done')
+            setVideoProgress(100)
+          } else if (sData.status === 'FAILED') {
+            clearInterval(pollRef.current)
+            clearInterval(simTick)
+            setVideoStatus('error')
+          }
+        } catch {
+          clearInterval(pollRef.current)
+          clearInterval(simTick)
+          setVideoStatus('error')
+        }
+      }, 5000)
+    } catch {
+      setVideoStatus('error')
+    }
+  }
+
+  function setCena(i, field, val) {
+    setCampos(p => {
+      const cenas = (p.cenas || []).map((c, idx) => idx === i ? { ...c, [field]: val } : c)
+      return { ...p, cenas }
+    })
+  }
 
   function getPreview() {
     if (tipo === 'estatico') {
@@ -275,93 +376,23 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
     ].join('\n\n')
   }
 
-  function handleCopy() {
-    navigator.clipboard.writeText(buildText()).catch(() => {})
-  }
-
+  function handleCopy()     { navigator.clipboard.writeText(buildText()).catch(() => {}) }
   function handleDownload() {
     const blob = new Blob([buildText()], { type: 'text/plain' })
     const url  = URL.createObjectURL(blob)
     const a    = document.createElement('a')
-    a.href     = url
-    a.download = `${tipo}-${vLabel}.txt`
-    a.click()
+    a.href = url; a.download = `${tipo}-${vLabel}.txt`; a.click()
     URL.revokeObjectURL(url)
   }
 
-  async function handleGerarImagem() {
-    if (imageLoading) return
-    setImageLoading(true)
-    try {
-      const prompt = imagemPrompt || campos.referenciaVisual || 'Luxury real estate property, Brazil, modern architecture'
-      const res    = await fetch('/api/gerar-imagem', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ prompt }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Erro')
-      setImageUrl(data.imageUrl)
-    } catch {
-      // fail silently
-    } finally {
-      setImageLoading(false)
-    }
-  }
-
-  async function handleGerarVideo() {
-    if (videoStatus === 'loading') return
-    setVideoStatus('loading')
-    setVideoProgress(15)
-
-    const prompt = (campos.cenas || []).map(c => c.cena).filter(Boolean).join('. ')
-      || imagemPrompt || 'Real estate property promotional video Brazil'
-
-    try {
-      const res  = await fetch('/api/gerar-video', {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ prompt }),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Erro')
-
-      const { requestId } = data
-      setVideoProgress(25)
-
-      const poll = setInterval(async () => {
-        try {
-          const sr    = await fetch(`/api/gerar-video?requestId=${requestId}`)
-          const sData = await sr.json()
-          if (sData.status === 'COMPLETED') {
-            clearInterval(poll)
-            setVideoUrl(sData.url)
-            setVideoStatus('done')
-            setVideoProgress(100)
-          } else if (sData.status === 'FAILED') {
-            clearInterval(poll)
-            setVideoStatus('error')
-          } else {
-            setVideoProgress(p => Math.min(p + 8, 90))
-          }
-        } catch {
-          clearInterval(poll)
-          setVideoStatus('error')
-        }
-      }, 3000)
-    } catch {
-      setVideoStatus('error')
-    }
-  }
-
-  function setCena(i, field, val) {
-    setCampos(p => {
-      const cenas = (p.cenas || []).map((c, idx) => idx === i ? { ...c, [field]: val } : c)
-      return { ...p, cenas }
-    })
-  }
-
+  const score      = variacao.score
+  const scoreJustif = variacao.scoreJustif
   const scoreLabel = score != null ? `${Number(score).toFixed(1)}/10` : null
+  const scoreColor = score >= 8.5 ? 'bg-green-100 text-green-700' : score >= 7 ? 'bg-amber-100 text-amber-700' : 'bg-red-100 text-red-600'
+
+  // Progress label for video
+  const elapsed    = Math.round((videoProgress / 100) * 90)
+  const remaining  = Math.max(0, 90 - elapsed)
 
   return (
     <>
@@ -373,20 +404,43 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
             <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-[#FFF1EE] text-[#E85D3A]">
               {vLabel}
             </span>
-            {/* Duration only for video types */}
+
+            {/* Duration only for video cards */}
             {isVideo && (
               <>
                 <span className="px-2 py-0.5 rounded-full text-xs bg-slate-100 text-[#64748B]">{duracao}</span>
                 <span className="text-xs text-[#94A3B8]">{isLonga ? 'Longa' : 'Curta'}</span>
               </>
             )}
+
+            {/* Per-variation score badge with tooltip */}
             {scoreLabel && (
-              <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-green-50 text-green-700">
-                {scoreLabel}
-              </span>
+              <div className="relative group">
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium cursor-default ${scoreColor}`}>
+                  {scoreLabel}
+                </span>
+                {scoreJustif && (
+                  <div className="absolute bottom-full left-0 mb-1.5 w-52 bg-[#0F172A] text-white text-xs rounded-lg px-3 py-2 leading-relaxed opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-20 shadow-lg">
+                    {scoreJustif}
+                    <div className="absolute top-full left-3 w-2 h-2 bg-[#0F172A] rotate-45 -mt-1" />
+                  </div>
+                )}
+              </div>
             )}
           </div>
+
           <div className="flex items-center gap-1.5">
+            {/* Video status indicator */}
+            {isVideo && videoStatus === 'loading' && (
+              <span className="flex items-center gap-1 text-xs text-[#94A3B8]">
+                <Loader size={10} style={{ animation: 'spin 1s linear infinite' }} />
+                ~{remaining}s
+              </span>
+            )}
+            {isVideo && videoStatus === 'done' && (
+              <span className="text-xs text-green-600 font-medium">✓ Vídeo pronto</span>
+            )}
+
             {isVideo && (
               <button
                 onClick={() => setShowModal(true)}
@@ -399,14 +453,12 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
               onClick={() => setExpanded(e => !e)}
               className="flex items-center gap-1 text-xs text-[#64748B] hover:text-[#0F172A] transition-colors duration-200"
             >
-              {expanded
-                ? <><ChevronUp size={13} /> Recolher</>
-                : <><ChevronDown size={13} /> Expandir</>}
+              {expanded ? <><ChevronUp size={13} /> Recolher</> : <><ChevronDown size={13} /> Expandir</>}
             </button>
           </div>
         </div>
 
-        {/* Image preview for estáticos */}
+        {/* Drive image preview for estáticos */}
         {tipo === 'estatico' && (
           <div className="mb-3">
             {imageUrl ? (
@@ -415,22 +467,26 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
                 alt=""
                 className="w-full rounded-xl object-cover border border-[#E2E8F0]"
                 style={{ height: '140px' }}
+                onError={() => setImageUrl(null)}
               />
             ) : (
               <div className="rounded-xl bg-[#F8FAFC] border border-dashed border-[#E2E8F0] flex items-center justify-center gap-2 py-3">
                 <FileImage size={13} color="#94A3B8" />
-                <span className="text-xs text-[#94A3B8]">Sem imagem</span>
-                <button
-                  onClick={handleGerarImagem}
-                  disabled={imageLoading}
-                  className="flex items-center gap-1 text-xs text-[#E85D3A] font-medium hover:underline disabled:opacity-50 ml-1"
-                >
-                  {imageLoading
-                    ? <><Loader size={10} style={{ animation: 'spin 1s linear infinite' }} /> Gerando...</>
-                    : 'Gerar imagem'}
-                </button>
+                <span className="text-xs text-[#94A3B8]">Imagem do Drive não disponível</span>
               </div>
             )}
+          </div>
+        )}
+
+        {/* Video progress bar (compact, in card header area) */}
+        {isVideo && videoStatus === 'loading' && (
+          <div className="mb-3">
+            <div className="w-full h-1 bg-[#E2E8F0] rounded-full overflow-hidden">
+              <div
+                className="h-full bg-[#E85D3A] rounded-full transition-all duration-700"
+                style={{ width: `${videoProgress}%` }}
+              />
+            </div>
           </div>
         )}
 
@@ -447,17 +503,6 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
             {tipo === 'estatico' ? (
               <>
                 {imageUrl && <CanvaEditor imageUrl={imageUrl} campos={campos} setCampos={setCampos} />}
-                {!imageUrl && (
-                  <button
-                    onClick={handleGerarImagem}
-                    disabled={imageLoading}
-                    className="w-full mb-4 flex items-center justify-center gap-2 py-2.5 bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
-                  >
-                    {imageLoading
-                      ? <><Loader size={12} style={{ animation: 'spin 1s linear infinite' }} /> Gerando imagem...</>
-                      : <><FileImage size={12} /> Gerar Imagem</>}
-                  </button>
-                )}
                 <Field label="Referência Visual" value={campos.referenciaVisual}
                   onChange={v => setCampos(p => ({ ...p, referenciaVisual: v }))} rows={2} />
                 <Field label="Texto da Arte" value={campos.textoDaArte}
@@ -467,6 +512,13 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
               </>
             ) : (
               <>
+                {/* Inline video player if ready */}
+                {videoUrl && (
+                  <video controls className="w-full rounded-xl mb-4 border border-[#E2E8F0]">
+                    <source src={videoUrl} type="video/mp4" />
+                  </video>
+                )}
+
                 {(campos.cenas || []).map((cena, i) => (
                   <div key={i} className="mb-5 p-3 bg-[#F8FAFC] rounded-xl border border-[#E2E8F0]">
                     <p className="text-xs font-bold text-[#94A3B8] uppercase tracking-wider mb-3">Cena {i + 1}</p>
@@ -477,44 +529,11 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
                 ))}
                 <Field label="Legenda" value={campos.legenda}
                   onChange={v => setCampos(p => ({ ...p, legenda: v }))} rows={4} />
-
-                {/* Inline video generation */}
-                <div className="mb-4">
-                  {videoStatus === 'loading' && (
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs text-[#64748B] mb-1">
-                        <span>Gerando vídeo…</span><span>{videoProgress}%</span>
-                      </div>
-                      <div className="w-full h-1.5 bg-[#E2E8F0] rounded-full overflow-hidden">
-                        <div className="h-full bg-[#E85D3A] rounded-full transition-all duration-500" style={{ width: `${videoProgress}%` }} />
-                      </div>
-                    </div>
-                  )}
-                  {videoUrl && (
-                    <video controls className="w-full rounded-xl mb-3 border border-[#E2E8F0]">
-                      <source src={videoUrl} type="video/mp4" />
-                    </video>
-                  )}
-                  {videoStatus !== 'done' && (
-                    <button
-                      onClick={handleGerarVideo}
-                      disabled={videoStatus === 'loading'}
-                      className="flex items-center gap-2 px-4 py-2 bg-[#0F172A] hover:bg-[#1E293B] text-white text-xs font-semibold rounded-lg transition-colors disabled:opacity-50"
-                    >
-                      {videoStatus === 'loading'
-                        ? <><Loader size={13} style={{ animation: 'spin 1s linear infinite' }} /> Gerando...</>
-                        : <><Video size={13} /> Gerar Vídeo</>}
-                    </button>
-                  )}
-                  {videoStatus === 'error' && (
-                    <p className="text-xs text-red-500 mt-2">Erro ao gerar vídeo. Tente novamente.</p>
-                  )}
-                </div>
               </>
             )}
 
             {/* Actions */}
-            <div className="flex gap-2">
+            <div className="flex gap-2 mt-2">
               <button onClick={handleCopy}
                 className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-[#64748B] border border-[#E2E8F0] rounded-lg hover:bg-[#F8FAFC] transition-all">
                 <Copy size={12} /> Copiar
@@ -539,7 +558,6 @@ export default function VariacaoCard({ variacao, tipo, score, imagemPrompt }) {
           videoUrl={videoUrl}
           videoStatus={videoStatus}
           videoProgress={videoProgress}
-          onGerarVideo={handleGerarVideo}
           onClose={() => setShowModal(false)}
         />
       )}

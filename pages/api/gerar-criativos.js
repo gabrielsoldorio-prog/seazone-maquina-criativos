@@ -22,9 +22,17 @@ NUNCA USE → USE SEMPRE:
 
 ## VARIAÇÕES OBRIGATÓRIAS POR ESTRUTURA
 Cada estrutura tem exatamente 5 variações:
-- variacao 1, 2, 3: tipo "longa", duracao "30-40s" (vídeos) — versões completas com todas as cenas
-- variacao 4, 5: tipo "curta", duracao "10-20s" (vídeos) — versões reduzidas, 2-3 cenas máximo
-Total obrigatório: 15 itens por formato, 45 no total.
+- variacao 1, 2, 3: tipo "longa", duracao "30-40s" (vídeos)
+- variacao 4, 5: tipo "curta", duracao "10-20s" (vídeos)
+Total: 15 itens por formato, 45 no total.
+
+## AVALIAÇÃO INDIVIDUAL
+Para cada uma das 45 variações, avalie:
+- Aderência ao briefing (Do's e Don'ts respeitados)
+- Qualidade do copy (clareza, argumento financeiro, CTA)
+- Dados financeiros corretos com sufixo
+- Tom de voz adequado ao formato e público
+Gere notas reais (6.0 a 9.5) com valores DIFERENTES por variação e justificativas curtas (máx 80 chars).
 
 ## FORMATO DE RESPOSTA
 Responda APENAS com JSON válido com exatamente esta estrutura:
@@ -68,26 +76,31 @@ Responda APENAS com JSON válido com exatamente esta estrutura:
       { "estrutura": 3, "variacao": 5, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." }
     ],
     "estatico": [
-      { "estrutura": 1, "variacao": 1, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 1, "variacao": 2, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 1, "variacao": 3, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 1, "variacao": 4, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 1, "variacao": 5, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 2, "variacao": 1, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 2, "variacao": 2, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 2, "variacao": 3, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 2, "variacao": 4, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 2, "variacao": 5, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 3, "variacao": 1, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 3, "variacao": 2, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 3, "variacao": 3, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 3, "variacao": 4, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
-      { "estrutura": 3, "variacao": 5, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." }
+      { "estrutura": 1, "variacao": 1, "referenciaVisual": "vista aérea do bairro...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 2, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 3, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 4, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 5, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 1, "referenciaVisual": "fachada do empreendimento...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 2, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 3, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 4, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 5, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 1, "referenciaVisual": "rooftop com piscina...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 2, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 3, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 4, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 5, "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." }
     ]
   },
   "agentes": {
     "nota": 8.5,
-    "justificativa": "Justificativa da pontuação em relação ao alinhamento com briefing e público-alvo",
+    "justificativa": "Justificativa geral da pontuação",
+    "scores": {
+      "videoApresentadora": [[8.5,"PIN correto, dados confirmados, tom de autoridade"],[8.2,"..."],[7.9,"..."],[8.1,"..."],[7.5,"..."],[8.3,"..."],[8.0,"..."],[7.8,"..."],[8.4,"..."],[7.6,"..."],[7.8,"..."],[8.1,"..."],[8.3,"..."],[7.7,"..."],[8.0,"..."]],
+      "videoNarrado":       [[8.4,"..."],[8.1,"..."],[7.9,"..."],[7.8,"..."],[8.2,"..."],[8.3,"..."],[8.0,"..."],[7.8,"..."],[8.4,"..."],[7.6,"..."],[7.8,"..."],[8.1,"..."],[8.3,"..."],[7.7,"..."],[8.0,"..."]],
+      "estatico":           [[9.0,"..."],[8.5,"..."],[8.8,"..."],[8.3,"..."],[8.7,"..."],[8.6,"..."],[8.2,"..."],[8.9,"..."],[8.4,"..."],[8.7,"..."],[8.5,"..."],[8.1,"..."],[8.8,"..."],[8.3,"..."],[8.6,"..."]]
+    },
     "revisor": {
       "pinLocalizacao": true,
       "dadosConfirmados": true,
@@ -109,6 +122,32 @@ export const config = {
   maxDuration: 120,
 }
 
+// ── Normalização de posição ───────────────────────────────────────────────────
+// Garante estrutura/variacao corretos independente do que a IA retornar.
+// Posição 0-4 → estrutura 1, variacao 1-5
+// Posição 5-9 → estrutura 2, variacao 1-5
+// Posição 10-14 → estrutura 3, variacao 1-5
+function normalizarPosicao(items, isVideo) {
+  return (items || []).map((item, idx) => {
+    const est = Math.floor(idx / 5) + 1
+    const vrc = (idx % 5) + 1
+    const updated = { ...item, estrutura: est, variacao: vrc }
+    if (isVideo) {
+      updated.tipo   = vrc <= 3 ? 'longa' : 'curta'
+      updated.duracao = vrc <= 3 ? '30-40s' : '10-20s'
+    }
+    return updated
+  })
+}
+
+function vincularScores(items, scoresArr) {
+  return items.map((item, idx) => ({
+    ...item,
+    score:       scoresArr?.[idx]?.[0] ?? null,
+    scoreJustif: scoresArr?.[idx]?.[1] ?? null,
+  }))
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') return res.status(405).json({ error: 'Método não permitido' })
 
@@ -118,12 +157,12 @@ export default async function handler(req, res) {
   const geminiKey = process.env.GROQ_API_KEY
   if (!geminiKey) return res.status(500).json({ error: 'GROQ_API_KEY não configurada' })
 
-  const userPrompt = `Gere os 9 roteiros completos para o seguinte empreendimento Seazone:
+  const userPrompt = `Gere os 45 roteiros completos (3 formatos × 3 estruturas × 5 variações) para o seguinte empreendimento Seazone:
 
 ${JSON.stringify(briefing, null, 2)}
 
 Siga rigorosamente as regras do sistema. Respeite os Do's e Don'ts específicos do briefing.
-Após gerar os roteiros, avalie seu próprio trabalho com o agente nota (0-10) e o agente revisor (checklist).
+Avalie cada uma das 45 variações individualmente com notas DIFERENTES entre si (6.0-9.5) no campo scores.
 Responda apenas com o JSON.`
 
   try {
@@ -134,9 +173,26 @@ Responda apenas com o JSON.`
       maxOutputTokens: 12000,
       jsonMode: true,
     })
-    console.log('gerar-criativos: Gemini respondeu', rawText.slice(0, 80))
+    console.log('gerar-criativos: Groq respondeu', rawText.slice(0, 80))
 
     const parsed = parseRobust(rawText)
+
+    // ── Normaliza posição e vincula scores ────────────────────────────────────
+    const sc = parsed.agentes?.scores || {}
+    parsed.materiais = parsed.materiais || {}
+    parsed.materiais.videoApresentadora = vincularScores(
+      normalizarPosicao(parsed.materiais.videoApresentadora, true),
+      sc.videoApresentadora
+    )
+    parsed.materiais.videoNarrado = vincularScores(
+      normalizarPosicao(parsed.materiais.videoNarrado, true),
+      sc.videoNarrado
+    )
+    parsed.materiais.estatico = vincularScores(
+      normalizarPosicao(parsed.materiais.estatico, false),
+      sc.estatico
+    )
+
     return res.status(200).json(parsed)
   } catch (err) {
     console.error('gerar-criativos erro:', err)
@@ -146,33 +202,26 @@ Responda apenas com o JSON.`
 
 /**
  * Tenta parsear JSON com pipeline de reparo progressivo.
- * Lida com: markdown fences, caracteres de controle, vírgulas trailing.
  */
 function parseRobust(raw) {
-  // 1. Remove markdown code fences (```json ... ```)
   let text = raw
     .replace(/^```(?:json)?\s*/im, '')
     .replace(/\s*```$/im, '')
     .trim()
 
-  // 2. Extrai o bloco JSON mais externo
   const start = text.indexOf('{')
   const end   = text.lastIndexOf('}')
   if (start === -1 || end === -1) throw new Error('Nenhum bloco JSON encontrado na resposta')
   text = text.slice(start, end + 1)
 
-  // 3. Tentativa direta (caminho feliz)
   try { return JSON.parse(text) } catch (_) {}
 
-  // 4. Remove caracteres de controle que não são \n \r \t
   text = text.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, '')
   try { return JSON.parse(text) } catch (_) {}
 
-  // 5. Remove vírgulas trailing antes de } ou ]
   text = text.replace(/,(\s*[}\]])/g, '$1')
   try { return JSON.parse(text) } catch (_) {}
 
-  // 6. Converte quebras de linha literais dentro de strings em \n escapado
   text = text.replace(/"((?:[^"\\]|\\.)*)"/g, (_, inner) => {
     const fixed = inner.replace(/\n/g, '\\n').replace(/\r/g, '\\r').replace(/\t/g, '\\t')
     return `"${fixed}"`
