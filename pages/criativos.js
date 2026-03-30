@@ -1,189 +1,120 @@
 import { useState, useEffect } from 'react'
 import Head from 'next/head'
 import { useRouter } from 'next/router'
-import CenaTable from '../components/CenaTable'
-import ImageAnnotator from '../components/ImageAnnotator'
-import VideoPlayer from '../components/VideoPlayer'
-import AgenteCard from '../components/AgenteCard'
+import Layout from '../components/Layout'
+import AgentPanel from '../components/AgentPanel'
+import VariacaoCard from '../components/VariacaoCard'
+import { useToast } from '../components/Toast'
+import { Loader, Plus } from 'lucide-react'
 
-const C = {
-  bg: '#0d0d0d', card: '#111118', border: '#1e1e2e',
-  coral: '#E8533A', text: '#e0e0e0', sub: '#888', label: '#555'
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+function agruparPorEstrutura(materiais) {
+  const grupos = {}
+  ;(materiais || []).forEach(m => {
+    const e = m.estrutura || 1
+    if (!grupos[e]) grupos[e] = []
+    grupos[e].push(m)
+  })
+  return grupos
 }
+
+// ── Skeleton row ──────────────────────────────────────────────────────────────
+
+function SkeletonCards() {
+  return (
+    <div className="grid grid-cols-3 gap-4">
+      {[1, 2, 3, 4, 5].map(i => (
+        <div key={i} className="bg-white rounded-2xl border border-[#E2E8F0] p-4 animate-pulse">
+          <div className="flex gap-2 mb-3">
+            <div className="h-5 w-8 bg-gray-200 rounded-full" />
+            <div className="h-5 w-12 bg-gray-200 rounded-full" />
+          </div>
+          <div className="space-y-2">
+            <div className="h-3 bg-gray-200 rounded w-full" />
+            <div className="h-3 bg-gray-200 rounded w-3/4" />
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ── Estrutura section ─────────────────────────────────────────────────────────
+
+function EstruturaSection({ numero, variacoes, tipo, loading }) {
+  return (
+    <section className="mb-10">
+      <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Estrutura {numero}</h2>
+      {loading ? (
+        <SkeletonCards />
+      ) : variacoes.length > 0 ? (
+        <div className="grid grid-cols-3 gap-4">
+          {variacoes.map((v, i) => (
+            <VariacaoCard key={v.variacao ?? i} variacao={v} tipo={tipo} />
+          ))}
+        </div>
+      ) : (
+        <div className="bg-white rounded-2xl border border-[#E2E8F0] p-6 text-sm text-[#94A3B8] text-center">
+          Nenhuma variação disponível para esta estrutura.
+        </div>
+      )}
+    </section>
+  )
+}
+
+// ── Página principal ──────────────────────────────────────────────────────────
 
 const TABS = [
-  { id: 'estatico',       label: 'Estáticos',          icone: '🖼️' },
-  { id: 'narrado',        label: 'Vídeos Narrados',     icone: '🎙️' },
-  { id: 'apresentadora',  label: 'Vídeos Apresentadora',icone: '🎬' },
+  { id: 'estatico',      label: 'Estáticos' },
+  { id: 'narrado',       label: 'Narrados' },
+  { id: 'apresentadora', label: 'Apresentadora' },
 ]
 
-function Spinner() {
-  return <span style={{ width: '14px', height: '14px', border: '2px solid #333', borderTop: `2px solid ${C.coral}`, borderRadius: '50%', display: 'inline-block', animation: 'spin 0.8s linear infinite' }} />
-}
-
-// ─── Card de material individual ──────────────────────────────────────────
-function MaterialCard({ tipo, estrutura, material, midia, composicao, onAtualizar }) {
-  const locucaoOriginal = tipo !== 'estatico'
-    ? (material?.cenas || []).map(c => c.locucao || '').filter(Boolean).join('\n\n')
-    : ''
-
-  return (
-    <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '22px', marginBottom: '20px' }}>
-
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '16px' }}>
-        <span style={{
-          background: '#1a1010', color: C.coral, border: `1px solid ${C.coral}44`,
-          padding: '3px 9px', borderRadius: '5px', fontSize: '11px', fontWeight: '700', letterSpacing: '0.06em'
-        }}>
-          Estrutura {estrutura}
-        </span>
-        {material?.duracao && (
-          <span style={{ color: C.label, fontSize: '12px' }}>{material.duracao}</span>
-        )}
-      </div>
-
-      {/* ESTÁTICO — pins clicáveis na imagem */}
-      {tipo === 'estatico' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <ImageAnnotator
-            src={midia?.imagemUrl}
-            alt={`Estático estrutura ${estrutura}`}
-            tipo="estatico"
-            estrutura={estrutura}
-            composicao={composicao}
-            onNovosDados={onAtualizar}
-          />
-
-          {midia?.imagemErro && (
-            <p style={{ margin: 0, fontSize: '11px', color: '#f87171' }}>Erro ao gerar imagem: {midia.imagemErro}</p>
-          )}
-
-          {material?.referenciaVisual && (
-            <div style={{ background: '#0d0d14', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '14px' }}>
-              <p style={{ margin: '0 0 6px', color: C.label, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Referência Visual</p>
-              <p style={{ margin: 0, color: C.sub, fontSize: '13px', lineHeight: '1.5' }}>{material.referenciaVisual}</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* VÍDEO — timeline Frame.io */}
-      {(tipo === 'narrado' || tipo === 'apresentadora') && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-          <VideoPlayer
-            src={tipo === 'narrado' ? midia?.narradoAudio : midia?.apresentadoraAudio}
-            tipo="audio"
-            tipoMidia={tipo}
-            estrutura={estrutura}
-            locucaoOriginal={locucaoOriginal}
-            onNovosDados={onAtualizar}
-            label={tipo === 'narrado'
-              ? 'Narração em off — ElevenLabs'
-              : 'Voz da Mônica — ElevenLabs (lip-sync via script de produção)'}
-          />
-          {tipo === 'apresentadora' && (
-            <div style={{ background: '#0d0d14', border: `1px solid ${C.border}`, borderRadius: '8px', padding: '12px 14px', fontSize: '12px', color: '#7ec8e3' }}>
-              Para gerar o MP4 com lip-sync: <code style={{ fontFamily: 'monospace', color: '#a0c8e0' }}>node ferramentas/gerar-lipsync-var2.mjs</code>
-            </div>
-          )}
-          {material?.cenas && <CenaTable cenas={material.cenas} />}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ─── Legenda unificada por aba ─────────────────────────────────────────────
-function LegendaAba({ valor, onChange }) {
-  return (
-    <div style={{ marginTop: '8px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', padding: '20px' }}>
-      <p style={{ margin: '0 0 10px', color: C.label, fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-        Legenda do Post
-      </p>
-      <textarea
-        value={valor}
-        onChange={e => onChange(e.target.value)}
-        placeholder="Legenda gerada para este material..."
-        rows={6}
-        style={{
-          width: '100%', background: '#0d0d14', border: `1px solid ${C.border}`,
-          borderRadius: '8px', padding: '12px 14px', color: C.text,
-          fontSize: '13px', lineHeight: '1.65', resize: 'vertical',
-          fontFamily: 'inherit', outline: 'none', boxSizing: 'border-box'
-        }}
-      />
-    </div>
-  )
-}
-
-// ─── Página principal ──────────────────────────────────────────────────────
 export default function Criativos() {
-  const router = useRouter()
-  const [criativos, setCriativos] = useState(null)
-  const [midias, setMidias] = useState(null)
-  const [abaAtiva, setAbaAtiva] = useState('estatico')
-  const [loadingMidias, setLoadingMidias] = useState(false)
-  const [erroMidias, setErroMidias] = useState(null)
-  const [legendas, setLegendas] = useState({ estatico: '', narrado: '', apresentadora: '' })
+  const router   = useRouter()
+  const addToast = useToast()
 
-  function setLegenda(aba, valor) {
-    setLegendas(prev => ({ ...prev, [aba]: valor }))
-  }
+  const [criativos,     setCriativos]     = useState(null)
+  const [loadingMidias, setLoadingMidias] = useState(false)
+  const [abaAtiva,      setAbaAtiva]      = useState('estatico')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
     const data = localStorage.getItem('criativos')
     if (!data) { router.push('/'); return }
-    const parsed = JSON.parse(data)
-    setCriativos(parsed)
-    // Pré-preenche legendas com o primeiro material que tiver legenda em cada aba
-    const mat = parsed.materiais || {}
-    const primeiraLegenda = arr => (arr || []).find(m => m.legenda)?.legenda || ''
-    setLegendas({
-      estatico:      primeiraLegenda(mat.estatico),
-      narrado:       primeiraLegenda(mat.videoNarrado),
-      apresentadora: primeiraLegenda(mat.videoApresentadora),
-    })
-    gerarMidias(parsed)
+    setCriativos(JSON.parse(data))
   }, [])
 
-  async function gerarMidias(roteiros) {
-    setLoadingMidias(true)
-    setErroMidias(null)
-    try {
-      const res = await fetch('/api/gerar-midias', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ roteiros })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setMidias(data)
-    } catch (e) {
-      setErroMidias(e.message)
-    } finally {
-      setLoadingMidias(false)
-    }
+  if (!criativos) {
+    return (
+      <Layout title="Criativos">
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-pulse space-y-3 w-full max-w-2xl">
+            <div className="h-8 bg-gray-200 rounded w-1/3" />
+            <div className="h-4 bg-gray-200 rounded w-1/2" />
+            <div className="h-48 bg-gray-200 rounded-2xl" />
+          </div>
+        </div>
+      </Layout>
+    )
   }
-
-  function handleAtualizarMidia(tipo, novosDados) {
-    setMidias(prev => ({ ...prev, ...novosDados }))
-  }
-
-  if (!criativos) return (
-    <div style={{ minHeight: '100vh', background: C.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', color: C.sub, fontSize: '14px' }}>
-      Carregando criativos...
-    </div>
-  )
 
   const mat = criativos.materiais || {}
+
   const mapaAbas = {
-    // Estáticos: apenas Estrutura 1 por enquanto (composição visual por vez)
-    estatico:      { materiais: (mat.estatico || []).slice(0, 1),          tipo: 'estatico' },
-    narrado:       { materiais: mat.videoNarrado,                           tipo: 'narrado' },
-    apresentadora: { materiais: mat.videoApresentadora,                     tipo: 'apresentadora' },
+    estatico:      mat.estatico           || [],
+    narrado:       mat.videoNarrado       || [],
+    apresentadora: mat.videoApresentadora || [],
   }
-  const abaAtual = mapaAbas[abaAtiva]
+
+  const gruposAtivos = agruparPorEstrutura(mapaAbas[abaAtiva])
+
+  const totalMateriais = [
+    ...(mat.estatico || []),
+    ...(mat.videoNarrado || []),
+    ...(mat.videoApresentadora || []),
+  ].length
 
   return (
     <>
@@ -192,122 +123,88 @@ export default function Criativos() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <div style={{ minHeight: '100vh', background: C.bg, fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', color: C.text }}>
-
-        {/* Header */}
-        <header style={{ borderBottom: `1px solid ${C.border}`, padding: '14px 32px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', position: 'sticky', top: 0, background: C.bg, zIndex: 100 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-            <div style={{ width: '30px', height: '30px', background: C.coral, borderRadius: '7px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: '800', color: '#fff', fontSize: '13px' }}>S</div>
+      <Layout
+        title="Criativos"
+        subtitle={criativos.empreendimento}
+        rightPanel={
+          <AgentPanel agentes={criativos.agentes} criativos={criativos} />
+        }
+      >
+        {/* Stats bar */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-6">
             <div>
-              <div style={{ fontSize: '14px', fontWeight: '700', color: '#fff' }}>{criativos.empreendimento}</div>
-              {criativos.localizacao && <div style={{ fontSize: '11px', color: C.label }}>{criativos.localizacao}</div>}
+              <span className="text-2xl font-bold text-[#0F172A]">{totalMateriais}</span>
+              <span className="text-sm text-[#94A3B8] ml-1">materiais gerados</span>
+            </div>
+            <div className="h-5 w-px bg-[#E2E8F0]" />
+            <div className="text-sm text-[#64748B]">
+              3 formatos × 3 estruturas × 5 variações
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '6px' }}>
-            {[{ n: '01', l: 'Briefing', done: true }, { n: '02', l: 'Revisão', done: true }, { n: '03', l: 'Criativos', active: true }].map(({ n, l, done, active }) => (
-              <div key={n} style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
-                <div style={{
-                  width: '22px', height: '22px', borderRadius: '50%',
-                  background: active ? C.coral : done ? '#1a2a1a' : '#1a1a1a',
-                  color: active ? '#fff' : done ? '#4ade80' : C.label,
-                  border: `1px solid ${active ? C.coral : done ? '#2a5a2a' : C.border}`,
-                  fontSize: '10px', fontWeight: '700',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>{done ? '✓' : n}</div>
-                <span style={{ fontSize: '11px', color: active ? C.text : C.label }}>{l}</span>
-                {n !== '03' && <span style={{ color: C.border, fontSize: '12px' }}>›</span>}
-              </div>
-            ))}
-          </div>
-        </header>
+          <button
+            onClick={() => router.push('/')}
+            className="flex items-center gap-1.5 px-3 py-2 border border-[#E2E8F0] rounded-lg text-xs font-medium text-[#64748B] hover:bg-[#F8FAFC] transition-colors duration-200"
+          >
+            <Plus size={13} /> Novo projeto
+          </button>
+        </div>
 
-        <main style={{ maxWidth: '860px', margin: '0 auto', padding: '28px 20px' }}>
-
-          {/* Banner loading mídias */}
-          {loadingMidias && (
-            <div style={{ background: '#0f0f14', border: `1px solid ${C.border}`, borderRadius: '10px', padding: '14px 18px', marginBottom: '20px', display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <Spinner />
-              <span style={{ color: C.coral, fontSize: '13px', fontWeight: '500' }}>Gerando imagem via Sharp e áudios via ElevenLabs...</span>
-            </div>
-          )}
-          {erroMidias && (
-            <div style={{ background: '#1f0a0a', border: '1px solid #5a1a1a', borderRadius: '8px', padding: '12px 16px', marginBottom: '16px', color: '#f87171', fontSize: '13px' }}>
-              Erro ao gerar mídias: {erroMidias}
-            </div>
-          )}
-
-          {/* Abas */}
-          <div style={{ display: 'flex', gap: '4px', marginBottom: '24px', borderBottom: `1px solid ${C.border}`, paddingBottom: '0' }}>
+        {/* Tabs */}
+        <div className="border-b border-[#E2E8F0] mb-8">
+          <div className="flex gap-1">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setAbaAtiva(tab.id)}
-                style={{
-                  background: abaAtiva === tab.id ? C.card : 'transparent',
-                  border: `1px solid ${abaAtiva === tab.id ? C.border : 'transparent'}`,
-                  borderBottom: `2px solid ${abaAtiva === tab.id ? C.coral : 'transparent'}`,
-                  color: abaAtiva === tab.id ? C.text : C.label,
-                  padding: '10px 18px', borderRadius: '8px 8px 0 0',
-                  fontSize: '13px', fontWeight: abaAtiva === tab.id ? '600' : '400',
-                  cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px',
-                  transition: 'all 0.15s'
-                }}
+                className={`px-5 py-3 text-sm font-medium border-b-2 transition-all duration-200 ${
+                  abaAtiva === tab.id
+                    ? 'text-[#E85D3A] border-[#E85D3A]'
+                    : 'text-[#94A3B8] border-transparent hover:text-[#64748B]'
+                }`}
               >
-                <span>{tab.icone}</span> {tab.label}
+                {tab.label}
               </button>
             ))}
           </div>
+        </div>
 
-          {/* Materiais da aba ativa */}
-          {(abaAtual?.materiais || []).map((material, idx) => (
-            <MaterialCard
-              key={idx}
-              tipo={abaAtual.tipo}
-              estrutura={material.estrutura || idx + 1}
-              material={material}
-              midia={midias}
-              composicao={abaAtual.tipo === 'estatico' ? (
-                midias?.composicaoUsada || {
-                  nomeEmpreendimento: criativos.empreendimento || '',
-                  pin:                criativos.localizacao    || '',
-                  badge:              'LANÇAMENTO',
-                  textoDaArte:        material.textoDaArte     || '',
-                }
-              ) : null}
-              onAtualizar={(dados) => handleAtualizarMidia(abaAtual.tipo, dados)}
-            />
-          ))}
-
-          {/* Legenda unificada da aba */}
-          <LegendaAba
-            valor={legendas[abaAtiva]}
-            onChange={v => setLegenda(abaAtiva, v)}
-          />
-
-          {/* Agentes (nota + revisor) */}
-          <AgenteCard agentes={criativos.agentes} />
-
-          {/* Rodapé */}
-          <div style={{ marginTop: '40px', padding: '20px', background: C.card, border: `1px solid ${C.border}`, borderRadius: '12px', textAlign: 'center' }}>
-            <p style={{ margin: '0 0 12px', color: C.sub, fontSize: '13px' }}>
-              Estrutura 1 de cada formato gerada. Após aprovação, avance para as variações completas.
-            </p>
-            <button
-              onClick={() => router.push('/')}
-              style={{ background: 'transparent', border: `1px solid ${C.coral}55`, color: C.coral, padding: '9px 22px', borderRadius: '8px', cursor: 'pointer', fontSize: '13px', fontWeight: '600' }}
-            >
-              Novo empreendimento
-            </button>
+        {/* Loading mídias banner */}
+        {loadingMidias && (
+          <div className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-xl px-5 py-4 mb-6">
+            <Loader size={15} color="#E85D3A" style={{ animation: 'spin 1s linear infinite' }} />
+            <span className="text-sm text-[#64748B]">Gerando mídias via Sharp e ElevenLabs...</span>
           </div>
-        </main>
-      </div>
+        )}
+
+        {/* Estruturas */}
+        {[1, 2, 3].map(e => (
+          <EstruturaSection
+            key={e}
+            numero={e}
+            variacoes={gruposAtivos[e] || []}
+            tipo={abaAtiva}
+            loading={false}
+          />
+        ))}
+
+        {/* Rodapé */}
+        <div className="mt-8 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm px-6 py-5 text-center">
+          <p className="text-sm text-[#64748B] mb-3">
+            {totalMateriais} criativos gerados para {criativos.empreendimento}.
+            Expanda cada card para editar e exportar.
+          </p>
+          <button
+            onClick={() => router.push('/')}
+            className="px-5 py-2.5 border border-[#E85D3A] text-[#E85D3A] hover:bg-orange-50 rounded-lg text-sm font-semibold transition-colors duration-200"
+          >
+            Novo empreendimento
+          </button>
+        </div>
+      </Layout>
 
       <style jsx global>{`
-        * { box-sizing: border-box; }
-        body { margin: 0; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-        textarea:focus { border-color: #E8533A !important; outline: none; }
-        audio { accent-color: #E8533A; }
       `}</style>
     </>
   )

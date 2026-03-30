@@ -1,5 +1,5 @@
 const SYSTEM_PROMPT = `Você é um agente especialista em criação de criativos de performance para a Seazone.
-Você receberá um briefing estruturado de um empreendimento e deve gerar 9 roteiros completos.
+Você receberá um briefing estruturado e deve gerar 45 roteiros completos: 3 formatos × 3 estruturas × 5 variações.
 
 ## TERMOS PROIBIDOS
 NUNCA USE → USE SEMPRE:
@@ -20,44 +20,69 @@ NUNCA USE → USE SEMPRE:
 6. Vídeo narrado: sem lettering de identificação da Mônica
 7. Estático: dado financeiro único por variação (ROI% OU R$/mês, nunca os dois juntos)
 
+## VARIAÇÕES OBRIGATÓRIAS POR ESTRUTURA
+Cada estrutura tem exatamente 5 variações:
+- variacao 1, 2, 3: tipo "longa", duracao "30-40s" (vídeos) — versões completas com todas as cenas
+- variacao 4, 5: tipo "curta", duracao "10-20s" (vídeos) — versões reduzidas, 2-3 cenas máximo
+Total obrigatório: 15 itens por formato, 45 no total.
+
 ## FORMATO DE RESPOSTA
-Responda APENAS com JSON válido:
+Responda APENAS com JSON válido com exatamente esta estrutura:
 {
   "empreendimento": "...",
   "localizacao": "...",
-  "imagemPrompt": "Prompt em inglês para geração de imagem estática via Fal.ai ou DALL-E 3",
+  "imagemPrompt": "Prompt em inglês para geração de imagem via Fal.ai",
   "materiais": {
     "videoApresentadora": [
-      {
-        "estrutura": 1,
-        "duracao": "30-40s",
-        "cenas": [
-          { "cena": "descrição visual", "lettering": "texto sobreposto", "locucao": "fala da Mônica" }
-        ]
-      },
-      { "estrutura": 2, "duracao": "30-40s", "cenas": [] },
-      { "estrutura": 3, "duracao": "30-40s", "cenas": [] }
+      { "estrutura": 1, "variacao": 1, "tipo": "longa", "duracao": "30-40s", "cenas": [{ "cena": "...", "lettering": "...", "locucao": "..." }], "legenda": "..." },
+      { "estrutura": 1, "variacao": 2, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 1, "variacao": 3, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 1, "variacao": 4, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 1, "variacao": 5, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 1, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 2, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 3, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 4, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 5, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 1, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 2, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 3, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 4, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 5, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." }
     ],
     "videoNarrado": [
-      {
-        "estrutura": 1,
-        "duracao": "30-40s",
-        "cenas": [
-          { "cena": "descrição visual", "lettering": "texto sobreposto", "locucao": "narração em off" }
-        ]
-      },
-      { "estrutura": 2, "duracao": "30-40s", "cenas": [] },
-      { "estrutura": 3, "duracao": "30-40s", "cenas": [] }
+      { "estrutura": 1, "variacao": 1, "tipo": "longa", "duracao": "30-40s", "cenas": [{ "cena": "...", "lettering": "...", "locucao": "..." }], "legenda": "..." },
+      { "estrutura": 1, "variacao": 2, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 1, "variacao": 3, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 1, "variacao": 4, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 1, "variacao": 5, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 1, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 2, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 3, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 4, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 2, "variacao": 5, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 1, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 2, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 3, "tipo": "longa", "duracao": "30-40s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 4, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." },
+      { "estrutura": 3, "variacao": 5, "tipo": "curta", "duracao": "10-20s", "cenas": [], "legenda": "..." }
     ],
     "estatico": [
-      {
-        "estrutura": 1,
-        "referenciaVisual": "descrição da imagem de fundo",
-        "textoDaArte": "copy completo com PIN, badge Lançamento, headline, dado financeiro",
-        "legenda": "texto da legenda do post"
-      },
-      { "estrutura": 2, "referenciaVisual": "", "textoDaArte": "", "legenda": "" },
-      { "estrutura": 3, "referenciaVisual": "", "textoDaArte": "", "legenda": "" }
+      { "estrutura": 1, "variacao": 1, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 2, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 3, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 4, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 1, "variacao": 5, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 1, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 2, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 3, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 4, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 2, "variacao": 5, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 1, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 2, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 3, "tipo": "longa", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 4, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." },
+      { "estrutura": 3, "variacao": 5, "tipo": "curta", "referenciaVisual": "...", "textoDaArte": "...", "legenda": "..." }
     ]
   },
   "agentes": {
@@ -106,7 +131,7 @@ Responda apenas com o JSON.`
       systemPrompt: SYSTEM_PROMPT,
       userPrompt,
       geminiKey,
-      maxOutputTokens: 8000,
+      maxOutputTokens: 12000,
       jsonMode: true,
     })
     console.log('gerar-criativos: Gemini respondeu', rawText.slice(0, 80))
