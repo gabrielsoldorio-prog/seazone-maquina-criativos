@@ -77,7 +77,7 @@ Responda APENAS com JSON válido:
   }
 }`
 
-import { callOpenRouter } from '../../lib/openrouter'
+import { callGemini } from '../../lib/gemini'
 
 export const config = {
   api: { responseLimit: '4mb' },
@@ -90,8 +90,8 @@ export default async function handler(req, res) {
   const { briefing } = req.body
   if (!briefing) return res.status(400).json({ error: 'Briefing é obrigatório' })
 
-  const openrouterKey = process.env.OPENROUTER_API_KEY
-  if (!openrouterKey) return res.status(500).json({ error: 'OPENROUTER_API_KEY não configurada' })
+  const geminiKey = process.env.GEMINI_API_KEY
+  if (!geminiKey) return res.status(500).json({ error: 'GEMINI_API_KEY não configurada' })
 
   const userPrompt = `Gere os 9 roteiros completos para o seguinte empreendimento Seazone:
 
@@ -102,14 +102,14 @@ Após gerar os roteiros, avalie seu próprio trabalho com o agente nota (0-10) e
 Responda apenas com o JSON.`
 
   try {
-    const rawText = await callOpenRouter({
+    const rawText = await callGemini({
       systemPrompt: SYSTEM_PROMPT,
       userPrompt,
-      openrouterKey,
-      maxTokens: 8000,
-      jsonMode:  true,
+      geminiKey,
+      maxOutputTokens: 8000,
+      jsonMode: true,
     })
-    console.log('gerar-criativos: OpenRouter respondeu', rawText.slice(0, 80))
+    console.log('gerar-criativos: Gemini respondeu', rawText.slice(0, 80))
 
     const parsed = parseRobust(rawText)
     return res.status(200).json(parsed)
