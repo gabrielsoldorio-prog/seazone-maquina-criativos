@@ -1,10 +1,10 @@
 import { useState } from 'react'
-import { FileSearch, Type, ImageIcon, BarChart3, CheckCircle, Clock, Circle, ChevronDown, ChevronUp } from 'lucide-react'
+import { FileSearch, Type, FileImage, BarChart3, CheckCircle, Clock, Circle, ChevronDown, ChevronUp } from 'lucide-react'
 
 const AGENTS = [
   { id: 'briefing',     name: 'Agente de Briefing',     icon: FileSearch, desc: 'Analisa e estrutura o briefing do empreendimento.' },
   { id: 'copy',         name: 'Agente de Copy',          icon: Type,       desc: 'Gera roteiros e textos alinhados à marca Seazone.' },
-  { id: 'imagem',       name: 'Agente de Imagem',        icon: ImageIcon,  desc: 'Gera composições visuais e prompts para Fal.ai.' },
+  { id: 'imagem',       name: 'Agente de Imagem',        icon: FileImage,  desc: 'Gera composições visuais e prompts para Fal.ai.' },
   { id: 'benchmarking', name: 'Agente de Benchmarking',  icon: BarChart3,  desc: 'Analisa os criativos vs referências do mercado.' },
 ]
 
@@ -82,10 +82,10 @@ export default function AgentPanel({ agentes, criativos }) {
   const bgNota  = nota >= 8 ? 'bg-green-500'  : nota >= 6 ? 'bg-yellow-500'   : 'bg-red-500'
 
   const statuses = {
-    briefing:     criativos            ? 'concluido'   : 'aguardando',
-    copy:         agentes              ? 'concluido'   : criativos ? 'processando' : 'aguardando',
+    briefing:     criativos ? 'concluido' : 'aguardando',
+    copy:         criativos ? 'concluido' : 'aguardando',
     imagem:       'aguardando',
-    benchmarking: agentes              ? 'concluido'   : 'aguardando',
+    benchmarking: agentes  ? 'concluido' : 'aguardando',
   }
 
   const ABAS = ['agentes', 'logs', 'benchmarking']

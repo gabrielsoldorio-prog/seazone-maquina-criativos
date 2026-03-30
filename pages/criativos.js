@@ -7,7 +7,7 @@ import VariacaoCard from '../components/VariacaoCard'
 import { useToast } from '../components/Toast'
 import { Loader, Plus } from 'lucide-react'
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
 function agruparPorEstrutura(materiais) {
   const grupos = {}
@@ -19,7 +19,7 @@ function agruparPorEstrutura(materiais) {
   return grupos
 }
 
-// ── Skeleton row ──────────────────────────────────────────────────────────────
+// ── Skeleton ──────────────────────────────────────────────────────────────────
 
 function SkeletonCards() {
   return (
@@ -40,9 +40,9 @@ function SkeletonCards() {
   )
 }
 
-// ── Estrutura section ─────────────────────────────────────────────────────────
+// ── EstruturaSection ──────────────────────────────────────────────────────────
 
-function EstruturaSection({ numero, variacoes, tipo, loading }) {
+function EstruturaSection({ numero, variacoes, tipo, score, imagemPrompt, loading }) {
   return (
     <section className="mb-10">
       <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Estrutura {numero}</h2>
@@ -51,7 +51,13 @@ function EstruturaSection({ numero, variacoes, tipo, loading }) {
       ) : variacoes.length > 0 ? (
         <div className="grid grid-cols-3 gap-4">
           {variacoes.map((v, i) => (
-            <VariacaoCard key={v.variacao ?? i} variacao={v} tipo={tipo} />
+            <VariacaoCard
+              key={v.variacao ?? i}
+              variacao={v}
+              tipo={tipo}
+              score={score}
+              imagemPrompt={imagemPrompt}
+            />
           ))}
         </div>
       ) : (
@@ -75,9 +81,8 @@ export default function Criativos() {
   const router   = useRouter()
   const addToast = useToast()
 
-  const [criativos,     setCriativos]     = useState(null)
-  const [loadingMidias, setLoadingMidias] = useState(false)
-  const [abaAtiva,      setAbaAtiva]      = useState('estatico')
+  const [criativos, setCriativos] = useState(null)
+  const [abaAtiva,  setAbaAtiva]  = useState('estatico')
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -116,6 +121,9 @@ export default function Criativos() {
     ...(mat.videoApresentadora || []),
   ].length
 
+  const overallScore  = criativos.agentes?.nota ?? null
+  const imagemPrompt  = criativos.imagemPrompt  || null
+
   return (
     <>
       <Head>
@@ -123,13 +131,8 @@ export default function Criativos() {
         <meta name="viewport" content="width=device-width, initial-scale=1" />
       </Head>
 
-      <Layout
-        title="Criativos"
-        subtitle={criativos.empreendimento}
-        rightPanel={
-          <AgentPanel agentes={criativos.agentes} criativos={criativos} />
-        }
-      >
+      <Layout title="Criativos" subtitle={criativos.empreendimento}>
+
         {/* Stats bar */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-6">
@@ -169,14 +172,6 @@ export default function Criativos() {
           </div>
         </div>
 
-        {/* Loading mídias banner */}
-        {loadingMidias && (
-          <div className="flex items-center gap-3 bg-white border border-[#E2E8F0] rounded-xl px-5 py-4 mb-6">
-            <Loader size={15} color="#E85D3A" style={{ animation: 'spin 1s linear infinite' }} />
-            <span className="text-sm text-[#64748B]">Gerando mídias via Sharp e ElevenLabs...</span>
-          </div>
-        )}
-
         {/* Estruturas */}
         {[1, 2, 3].map(e => (
           <EstruturaSection
@@ -184,12 +179,22 @@ export default function Criativos() {
             numero={e}
             variacoes={gruposAtivos[e] || []}
             tipo={abaAtiva}
+            score={overallScore}
+            imagemPrompt={imagemPrompt}
             loading={false}
           />
         ))}
 
-        {/* Rodapé */}
-        <div className="mt-8 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm px-6 py-5 text-center">
+        {/* Agent Panel — inline */}
+        <section className="mt-4 mb-8">
+          <h2 className="text-lg font-semibold text-[#0F172A] mb-4">Agentes</h2>
+          <div className="bg-white rounded-2xl border border-[#E2E8F0] shadow-sm overflow-hidden">
+            <AgentPanel agentes={criativos.agentes} criativos={criativos} />
+          </div>
+        </section>
+
+        {/* Footer */}
+        <div className="mt-4 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm px-6 py-5 text-center">
           <p className="text-sm text-[#64748B] mb-3">
             {totalMateriais} criativos gerados para {criativos.empreendimento}.
             Expanda cada card para editar e exportar.
